@@ -159,6 +159,15 @@ app.post('/api/session/:sessionID/message', async (req, res) => {
   }
 });
 
+app.post('/api/session/:sessionID/abort', async (req, res) => {
+  try {
+    await octoolsClient.abortSession(req.params.sessionID);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/question/:requestID/reply', async (req, res) => {
   try {
     const { sessionID, answers } = req.body;

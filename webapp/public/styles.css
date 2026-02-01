@@ -391,7 +391,23 @@ body.dark .model-tag {
     transition: opacity 0.2s;
 }
 
-#sendBtn:disabled {
+#abortBtn {
+    background: var(--error-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    transition: opacity 0.2s;
+    font-size: 18px;
+}
+
+#sendBtn:disabled, #abortBtn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }

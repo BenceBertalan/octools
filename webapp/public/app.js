@@ -19,6 +19,7 @@ const closeAuth = document.getElementById('closeAuth');
 const authErrorDetails = document.getElementById('authErrorDetails');
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
+const abortBtn = document.getElementById('abortBtn');
 const messagesContainer = document.getElementById('messagesContainer');
 const eventsContainer = document.getElementById('eventsContainer');
 const logsContainer = document.getElementById('logsContainer');
@@ -85,6 +86,7 @@ messageInput.addEventListener('input', () => {
 
 // Send message
 sendBtn.addEventListener('click', sendMessage);
+abortBtn.addEventListener('click', abortLastPrompt);
 refreshLogsBtn.addEventListener('click', fetchLogs);
 messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -218,52 +220,6 @@ async function sendMessage() {
     }
 }
 
-function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}) {
-    console.log(`[UI] addMessage: role=${role}, text=${text?.substring(0, 30)}...`);
-    
-    if (!text) return;
-
-    const bubble = document.createElement('div');
-    bubble.className = `message-bubble ${role}`;
-    
-    if (metadata.agent || metadata.modelID) {
-        const infoBar = document.createElement('div');
-        infoBar.className = 'message-info-bar';
-        const agentName = metadata.agent || 'Default';
-        const modelName = metadata.modelID ? `${metadata.providerID ? metadata.providerID + '/' : ''}${metadata.modelID}` : '';
-        infoBar.innerHTML = `<span>🤖 ${agentName}</span>${modelName ? `<span class="model-tag">🧠 ${modelName}</span>` : ''}`;
-        bubble.appendChild(infoBar);
-    }
-
-    const content = document.createElement('div');
-    content.className = 'message-content';
-    content.innerHTML = marked.parse(text);
-    bubble.appendChild(content);
-
-    if (isQuestion) {
-        bubble.classList.add('question');
-        bubble.onclick = () => openQuestionModal(currentQuestion);
-    }
-    if (isError) {
-        bubble.classList.add('error');
-    }
-    if (isWarning) {
-        bubble.classList.add('warning');
-    }
-    if (isInfo) {
-        bubble.classList.add('info-blue');
-    }
-    
-    messagesContainer.appendChild(bubble);
-    
-    const time = document.createElement('div');
-    time.className = 'message-time';
-    time.textContent = new Date().toLocaleTimeString();
-    messagesContainer.appendChild(time);
-    
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
 function updateStreamingMessage(messageID, text, isReasoning = false, metadata = {}) {
     let streamMsg = document.getElementById('stream-' + messageID);
     if (!streamMsg) {
@@ -298,42 +254,78 @@ function removeStreamingMessage(messageID) {
 }
 
 function showQuestionNotification(data) {
-    addMessage('assistant', '🤔 I have a question for you. Click to answer.', true);
+    addMessage('assistant', '🤔 I have a question for you. Click to answer.', true, false, false, false, {}, data);
 }
 
-function openQuestionModal(data) {
-    if (!data) return;
+function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null) {
+    console.log(`[UI] addMessage: role=${role}, text=${text?.substring(0, 30)}... isQuestion=${isQuestion}`);
     
-    questionTitle.textContent = data.header || 'Question';
-    questionText.textContent = data.question;
+    if (!text) return;
+
+    const bubble = document.createElement('div');
+    bubble.className = `message-bubble ${role}`;
+    
+    if (metadata.agent || metadata.modelID) {
+        const infoBar = document.createElement('div');
+        infoBar.className = 'message-info-bar';
+        const agentName = metadata.agent || 'Default';
+        const modelName = metadata.modelID ? `${metadata.providerID ? metadata.providerID + '/' : ''}${metadata.modelID}` : '';
+        infoBar.innerHTML = `<span>🤖 ${agentName}</span>${modelName ? `<span class="model-tag">🧠 ${modelName}</span>` : ''}`;
+        bubble.appendChild(infoBar);
+    }
+
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    content.innerHTML = marked.parse(text);
+    bubble.appendChild(content);
+
+    if (isQuestion) {
+        bubble.classList.add('question');
+        const qData = questionData || currentQuestion;
+        console.log(`[UI] Attaching question click handler. Data:`, qData);
+        bubble.onclick = () => {
+            console.log(`[UI] Question bubble clicked. Data:`, qData);
+            if (qData) {
+                currentQuestion = qData; // Sync global for submit handler
+                openQuestionModal(qData);
+            } else {
+                console.warn(`[UI] No question data for bubble click`);
+            }
+        };
+    }
+
+function openQuestionModal(data) {
+    if (!data || !data.questions || !data.questions[0]) return;
+    
+    const q = data.questions[0];
+    questionTitle.textContent = q.header || 'Question';
+    questionText.textContent = q.question;
     questionOptions.innerHTML = '';
     
-    if (data.questions && data.questions[0]) {
-        const q = data.questions[0];
-        q.options.forEach((option, idx) => {
-            const optDiv = document.createElement('div');
-            optDiv.className = 'question-option';
-            
-            if (q.multiple) {
-                optDiv.innerHTML = `
-                    <input type="checkbox" id="opt-${idx}" value="${option.label}">
-                    <label for="opt-${idx}">${option.label}</label>
-                    <div style="font-size: 12px; color: #65676b; margin-top: 4px;">${option.description}</div>
-                `;
-            } else {
-                optDiv.innerHTML = `
-                    <strong>${option.label}</strong>
-                    <div style="font-size: 12px; color: #65676b; margin-top: 4px;">${option.description}</div>
-                `;
-                optDiv.onclick = () => {
-                    document.querySelectorAll('.question-option').forEach(o => o.classList.remove('selected'));
-                    optDiv.classList.add('selected');
-                    optDiv.dataset.value = option.label;
-                };
-            }
-            questionOptions.appendChild(optDiv);
-        });
-    }
+    q.options.forEach((option, idx) => {
+        const optDiv = document.createElement('div');
+        optDiv.className = 'question-option';
+        
+        if (q.multiple) {
+            optDiv.innerHTML = `
+                <input type="checkbox" id="opt-${idx}" value="${option.label}">
+                <label for="opt-${idx}">${option.label}</label>
+                <div style="font-size: 12px; color: #65676b; margin-top: 4px;">${option.description}</div>
+            `;
+        } else {
+            optDiv.innerHTML = `
+                <strong>${option.label}</strong>
+                <div style="font-size: 12px; color: #65676b; margin-top: 4px;">${option.description}</div>
+            `;
+            optDiv.onclick = () => {
+                document.querySelectorAll('.question-option').forEach(o => o.classList.remove('selected'));
+                optDiv.classList.add('selected');
+                optDiv.dataset.value = option.label;
+            };
+        }
+        questionOptions.appendChild(optDiv);
+    });
+    
     questionModal.classList.add('active');
 }
 
@@ -356,10 +348,11 @@ submitAnswer.addEventListener('click', async () => {
     }
     
     try {
-        await fetch(`/api/question/${currentQuestion.requestID}/reply`, {
+        const requestID = currentQuestion.requestID || currentQuestion.id;
+        await fetch(`/api/question/${requestID}/reply`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionID: currentSession.id, answers })
+            body: JSON.stringify({ sessionID: currentSession.id, answers: [answers] })
         });
         
         questionModal.classList.remove('active');
@@ -371,9 +364,43 @@ submitAnswer.addEventListener('click', async () => {
     }
 });
 
+async function abortLastPrompt() {
+    if (!currentSession) return;
+    
+    try {
+        console.log(`Aborting prompt for session ${currentSession.id}...`);
+        abortBtn.disabled = true;
+        
+        const response = await fetch(`/api/session/${currentSession.id}/abort`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || response.statusText);
+        }
+        
+        console.log('Abort successful');
+        addMessage('assistant', '🛑 Prompt aborted by user.', false, false, true);
+    } catch (error) {
+        console.error('Abort error:', error);
+        addEvent('Error', 'Failed to abort: ' + error.message);
+    } finally {
+        abortBtn.disabled = false;
+    }
+}
+
 function updateStatus(status, text) {
     statusDot.className = 'status-dot ' + status;
     statusText.textContent = text || status.charAt(0).toUpperCase() + status.slice(1);
+    
+    // Show/hide abort button based on status
+    if (status === 'busy' || status === 'retry') {
+        abortBtn.style.display = 'flex';
+    } else {
+        abortBtn.style.display = 'none';
+    }
 }
 
 function addEvent(type, data) {
@@ -465,6 +492,7 @@ function connectWebSocket() {
     
     ws.onmessage = (event) => {
         const { type, data } = JSON.parse(event.data);
+        console.log(`[WS] Event received: ${type}`, data);
         addEvent(type, data);
         
         switch (type) {
