@@ -12,8 +12,6 @@ const statusText = document.getElementById('statusText');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
 const closeSettings = document.getElementById('closeSettings');
-const questionModal = document.getElementById('questionModal');
-const closeQuestion = document.getElementById('closeQuestion');
 const authModal = document.getElementById('authModal');
 const closeAuth = document.getElementById('closeAuth');
 const authErrorDetails = document.getElementById('authErrorDetails');
@@ -35,11 +33,6 @@ const qsModelSelect = document.getElementById('qsModelSelect');
 const sessionList = document.getElementById('sessionList');
 const hideReasoningCheckbox = document.getElementById('hideReasoning');
 const darkThemeCheckbox = document.getElementById('darkTheme');
-const submitAnswer = document.getElementById('submitAnswer');
-const questionTitle = document.getElementById('questionTitle');
-const questionText = document.getElementById('questionText');
-const questionOptions = document.getElementById('questionOptions');
-
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -61,10 +54,6 @@ settingsBtn.addEventListener('click', () => {
 
 closeSettings.addEventListener('click', () => {
     settingsModal.classList.remove('active');
-});
-
-closeQuestion.addEventListener('click', () => {
-    questionModal.classList.remove('active');
 });
 
 closeAuth.addEventListener('click', () => {
@@ -253,10 +242,6 @@ function removeStreamingMessage(messageID) {
     if (streamMsg) streamMsg.remove();
 }
 
-function showQuestionNotification(data) {
-    addMessage('assistant', '🤔 I have a question for you. Click to answer.', true, false, false, false, {}, data);
-}
-
 function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null) {
     console.log(`[UI] addMessage: role=${role}, text=${text?.substring(0, 30)}... isQuestion=${isQuestion}`);
     
@@ -276,23 +261,92 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
 
     const content = document.createElement('div');
     content.className = 'message-content';
-    content.innerHTML = marked.parse(text);
+    try {
+        content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+    } catch (e) {
+        console.error('Marked parse error:', e);
+        content.textContent = text;
+    }
     bubble.appendChild(content);
 
     if (isQuestion) {
-        bubble.classList.add('question');
+        bubble.classList.add('question-inline');
         const qData = questionData || currentQuestion;
-        console.log(`[UI] Attaching question click handler. Data:`, qData);
-        bubble.onclick = () => {
-            console.log(`[UI] Question bubble clicked. Data:`, qData);
-            if (qData) {
-                currentQuestion = qData; // Sync global for submit handler
-                openQuestionModal(qData);
-            } else {
-                console.warn(`[UI] No question data for bubble click`);
+        
+        if (qData) {
+            const questions = qData.questions || (qData.properties && qData.properties.questions);
+            if (questions && questions[0]) {
+                const q = questions[0];
+                const optionsDiv = document.createElement('div');
+                optionsDiv.className = 'question-options-inline';
+                
+                const selectedLabels = new Set();
+                
+                const submitBtn = document.createElement('button');
+                submitBtn.className = 'submit-question-inline';
+                submitBtn.textContent = 'Submit Answer';
+                submitBtn.disabled = true;
+
+                q.options.forEach(option => {
+                    const optItem = document.createElement('div');
+                    optItem.className = 'option-item-inline';
+                    optItem.innerHTML = `<strong>${option.label}</strong><div style="font-size: 12px; opacity: 0.8">${option.description}</div>`;
+                    
+                    optItem.onclick = () => {
+                        if (optItem.classList.contains('disabled')) return;
+                        
+                        if (q.multiple) {
+                            if (selectedLabels.has(option.label)) {
+                                selectedLabels.delete(option.label);
+                                optItem.classList.remove('selected');
+                            } else {
+                                selectedLabels.add(option.label);
+                                optItem.classList.add('selected');
+                            }
+                        } else {
+                            optionsDiv.querySelectorAll('.option-item-inline').forEach(i => i.classList.remove('selected'));
+                            selectedLabels.clear();
+                            selectedLabels.add(option.label);
+                            optItem.classList.add('selected');
+                        }
+                        submitBtn.disabled = selectedLabels.size === 0;
+                    };
+                    optionsDiv.appendChild(optItem);
+                });
+                
+                submitBtn.onclick = async () => {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Submitting...';
+                    
+                    try {
+                        const requestID = qData.id || qData.requestID || (qData.properties && qData.properties.id);
+                        const answers = Array.from(selectedLabels);
+                        
+                        await fetch(`/api/question/${requestID}/reply`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sessionID: currentSession.id, answers: [answers] })
+                        });
+                        
+                        submitBtn.textContent = 'Answered ✅';
+                        submitBtn.disabled = true;
+                        optionsDiv.querySelectorAll('.option-item-inline').forEach(i => i.classList.add('disabled'));
+                    } catch (error) {
+                        console.error('Submit answer error:', error);
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Retry Submission';
+                    }
+                };
+                
+                content.appendChild(optionsDiv);
+                content.appendChild(submitBtn);
             }
-        };
+        }
     }
+    
+    if (isError) bubble.classList.add('error');
+    if (isWarning) bubble.classList.add('warning');
+    if (isInfo) bubble.classList.add('info-blue');
     
     messagesContainer.appendChild(bubble);
     
@@ -303,76 +357,6 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
-
-function openQuestionModal(data) {
-    if (!data || !data.questions || !data.questions[0]) return;
-    
-    const q = data.questions[0];
-    questionTitle.textContent = q.header || 'Question';
-    questionText.textContent = q.question;
-    questionOptions.innerHTML = '';
-    
-    q.options.forEach((option, idx) => {
-        const optDiv = document.createElement('div');
-        optDiv.className = 'question-option';
-        
-        if (q.multiple) {
-            optDiv.innerHTML = `
-                <input type="checkbox" id="opt-${idx}" value="${option.label}">
-                <label for="opt-${idx}">${option.label}</label>
-                <div style="font-size: 12px; color: #65676b; margin-top: 4px;">${option.description}</div>
-            `;
-        } else {
-            optDiv.innerHTML = `
-                <strong>${option.label}</strong>
-                <div style="font-size: 12px; color: #65676b; margin-top: 4px;">${option.description}</div>
-            `;
-            optDiv.onclick = () => {
-                document.querySelectorAll('.question-option').forEach(o => o.classList.remove('selected'));
-                optDiv.classList.add('selected');
-                optDiv.dataset.value = option.label;
-            };
-        }
-        questionOptions.appendChild(optDiv);
-    });
-    
-    questionModal.classList.add('active');
-}
-
-submitAnswer.addEventListener('click', async () => {
-    if (!currentQuestion) return;
-    
-    const q = currentQuestion.questions[0];
-    let answers = [];
-    
-    if (q.multiple) {
-        answers = Array.from(questionOptions.querySelectorAll('input:checked')).map(cb => cb.value);
-    } else {
-        const selected = questionOptions.querySelector('.question-option.selected');
-        if (selected) answers = [selected.dataset.value];
-    }
-    
-    if (answers.length === 0) {
-        alert('Please select an answer');
-        return;
-    }
-    
-    try {
-        const requestID = currentQuestion.requestID || currentQuestion.id;
-        await fetch(`/api/question/${requestID}/reply`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionID: currentSession.id, answers: [answers] })
-        });
-        
-        questionModal.classList.remove('active');
-        currentQuestion = null;
-        addMessage('user', '✅ Answer submitted: ' + answers.join(', '));
-    } catch (error) {
-        console.error('Submit answer error:', error);
-        alert('Failed to submit answer');
-    }
-});
 
 async function abortLastPrompt() {
     if (!currentSession) return;
