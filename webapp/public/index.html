@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OpenCode Chat</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <!-- Top Status Bar -->
+    <div class="status-bar" id="statusBar">
+        <div class="status-info">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="status-text" id="statusText">Initializing...</span>
+        </div>
+        <button class="settings-btn" id="settingsBtn">⚙️</button>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="chat">Chat</button>
+            <button class="tab-btn" data-tab="events">Events</button>
+        </div>
+
+        <!-- Chat Tab -->
+        <div class="tab-content active" id="chatTab">
+            <div class="messages-container" id="messagesContainer">
+                <div class="welcome-message">
+                    <h2>Welcome to OpenCode Chat</h2>
+                    <p>Select a model/agent and start chatting</p>
+                </div>
+            </div>
+            
+            <!-- Quick Settings Bar -->
+            <div class="quick-settings">
+                <div class="qs-item">
+                    <select id="qsAgentSelect" title="Change Agent">
+                        <option value="">Agent: Default</option>
+                    </select>
+                </div>
+                <div class="qs-item">
+                    <select id="qsModelSelect" title="Change Model">
+                        <option value="">Model: Default</option>
+                    </select>
+                </div>
+                <div class="qs-item toggle">
+                    <label class="switch">
+                        <input type="checkbox" id="hideReasoning">
+                        <span class="slider"></span>
+                    </label>
+                    <span>Hide Reasoning</span>
+                </div>
+                <div class="qs-item toggle">
+                    <label class="switch">
+                        <input type="checkbox" id="darkTheme">
+                        <span class="slider"></span>
+                    </label>
+                    <span>Dark Mode</span>
+                </div>
+            </div>
+            
+            <div class="input-container">
+                <textarea 
+                    id="messageInput" 
+                    placeholder="Type a message..." 
+                    rows="1"
+                ></textarea>
+                <button id="sendBtn" disabled>Send</button>
+            </div>
+        </div>
+
+        <!-- Events Tab -->
+        <div class="tab-content" id="eventsTab">
+            <div class="events-container" id="eventsContainer">
+                <div class="event-item">
+                    <div class="event-header">System</div>
+                    <div class="event-body">Waiting for events...</div>
+                    <div class="event-time" id="initialEventTime"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="close-btn" id="closeSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="agentSelect">Agent</label>
+                    <select id="agentSelect">
+                        <option value="">Default</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="modelSelect">Model</label>
+                    <select id="modelSelect">
+                        <option value="">Default</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="directoryInput">Directory</label>
+                    <input type="text" id="directoryInput" value="/root" autocomplete="off" spellcheck="false">
+                </div>
+                <button class="btn-primary" id="createSessionBtn">Create New Session</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Modal -->
+    <div class="modal" id="questionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="questionTitle">Question</h3>
+                <button class="close-btn" id="closeQuestion">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="questionText"></p>
+                <div id="questionOptions"></div>
+                <button class="btn-primary" id="submitAnswer">Submit Answer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

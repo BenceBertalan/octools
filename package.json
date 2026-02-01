@@ -2,8 +2,9 @@
   "name": "octools",
   "version": "1.0.0",
   "description": "Documentation and tools for OpenCode development.",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

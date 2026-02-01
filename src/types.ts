@@ -44,8 +44,27 @@ export interface MessagePart {
   text?: string;
   delta?: string; // From streaming events
   tool?: string;
-  state?: any;
-  // ... other fields as needed
+  state?: {
+    status?: 'pending' | 'running' | 'completed' | 'error';
+    title?: string;
+    description?: string;
+    agent?: string;
+    [key: string]: any;
+  };
+  metadata?: {
+    subagent_type?: string;
+    description?: string;
+    [key: string]: any;
+  };
+}
+
+export interface SubagentProgress {
+  sessionID: string;
+  messageID: string;
+  partID: string;
+  agent: string;
+  task: string;
+  status: 'pending' | 'running' | 'completed' | 'error';
 }
 
 export interface Message {

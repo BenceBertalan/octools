@@ -93,6 +93,24 @@ export class OctoolsClient extends EventEmitter {
           // { part: Part, delta?: string }
           if (properties.part && properties.part.sessionID) {
             this.recordAIActivity(properties.part.sessionID);
+            
+            // Handle subagent/task progress
+            if (properties.part.type === 'tool' || properties.part.type === 'subtask') {
+              const part = properties.part;
+              const agent = part.metadata?.subagent_type || part.state?.agent || 'agent';
+              const task = part.metadata?.description || part.state?.title || part.tool || 'working';
+              const status = part.state?.status || 'running';
+
+              this.emit('subagent.progress', {
+                sessionID: part.sessionID,
+                messageID: part.messageID,
+                partID: part.id,
+                agent,
+                task,
+                status
+              });
+            }
+
             this.emit('message.delta', {
               sessionID: properties.part.sessionID,
               messageID: properties.part.messageID,
@@ -159,7 +177,12 @@ export class OctoolsClient extends EventEmitter {
     return h;
   }
 
-  public async createSession(options?: { title?: string }): Promise<Session> {
+  public async createSession(options?: { 
+    title?: string;
+    agent?: string;
+    directory?: string;
+    model?: { providerID: string; modelID: string };
+  }): Promise<Session> {
     const res = await fetch(`${this.config.baseUrl}/session`, {
       method: 'POST',
       headers: this.headers,
@@ -191,12 +214,17 @@ export class OctoolsClient extends EventEmitter {
      return res.json() as Promise<Message[]>;
   }
 
-  public async sendMessage(sessionID: string, text: string): Promise<Message> {
+  public async sendMessage(sessionID: string, text: string, options?: { 
+    agent?: string; 
+    model?: { providerID: string; modelID: string } 
+  }): Promise<Message> {
     const res = await fetch(`${this.config.baseUrl}/session/${sessionID}/message`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ 
-        parts: [{ type: 'text', text }]
+        parts: [{ type: 'text', text }],
+        agent: options?.agent,
+        model: options?.model
       })
     });
     if (!res.ok) {
