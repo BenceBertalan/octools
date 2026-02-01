@@ -539,6 +539,10 @@ function connectWebSocket() {
                 const modelName = data.model?.modelID || 'unknown model';
                 addMessage('assistant', `🔄 **Model Switched**: Now using **${modelName}** (Reason: ${data.reason})`, false, false, false, true);
                 break;
+            case 'session.retrying_alternative':
+                const altModelName = data.model?.modelID || 'unknown model';
+                addMessage('assistant', `♻️ **Auto-Retry**: Retrying last prompt with **${altModelName}**...`, false, false, false, true);
+                break;
             case 'session.error':
                 // Fallback if not caught by specific event but has 401 status
                 if (data.error?.statusCode === 401 || data.isAuthError) {

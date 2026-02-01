@@ -229,6 +229,11 @@ wss.on('connection', (ws) => {
         ws.send(JSON.stringify({ type: 'session.model_switched', data }));
       }
     },
+    'session.retrying_alternative': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.retrying_alternative', data }));
+      }
+    },
     'error': (error) => {
       ws.send(JSON.stringify({ type: 'error', data: { message: error.message } }));
     }

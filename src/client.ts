@@ -19,6 +19,7 @@ export class OctoolsClient extends EventEmitter {
   private lastAIActivity: Map<string, number> = new Map();
   private sessionStatuses: Map<string, SessionStatusType> = new Map();
   private sessionModels: Map<string, { primary: any; secondary?: any; current: any }> = new Map();
+  private lastUserPrompts: Map<string, { text: string; options?: any }> = new Map();
   public rawEvents: { timestamp: number; payload: any }[] = [];
   private static MAX_LOGS = 2000;
 
@@ -109,6 +110,7 @@ export class OctoolsClient extends EventEmitter {
                 model: models.secondary,
                 reason: status.type
               });
+              this.triggerAlternativeRetry(sessionID, status.type);
             }
           }
           
@@ -196,18 +198,19 @@ export class OctoolsClient extends EventEmitter {
                 isAuthError
               });
 
-              // Secondary model switching logic for errors
-              if (properties.sessionID) {
-                const models = this.sessionModels.get(properties.sessionID);
-                if (models && models.secondary && JSON.stringify(models.current) !== JSON.stringify(models.secondary)) {
-                  models.current = models.secondary;
-                  this.emit('session.model_switched', {
-                    sessionID: properties.sessionID,
-                    model: models.secondary,
-                    reason: 'error'
-                  });
-                }
-              }
+               // Secondary model switching logic for errors
+               if (properties.sessionID) {
+                 const models = this.sessionModels.get(properties.sessionID);
+                 if (models && models.secondary && JSON.stringify(models.current) !== JSON.stringify(models.secondary)) {
+                   models.current = models.secondary;
+                   this.emit('session.model_switched', {
+                     sessionID: properties.sessionID,
+                     model: models.secondary,
+                     reason: 'error'
+                   });
+                   this.triggerAlternativeRetry(properties.sessionID, 'error');
+                 }
+               }
           }
           break;
 
@@ -293,6 +296,9 @@ export class OctoolsClient extends EventEmitter {
     agent?: string; 
     model?: { providerID: string; modelID: string } 
   }): Promise<Message> {
+    // Save last user prompt for alternative model retry
+    this.lastUserPrompts.set(sessionID, { text, options });
+
     const models = this.sessionModels.get(sessionID);
     const activeModel = options?.model || models?.current;
 
@@ -319,6 +325,32 @@ export class OctoolsClient extends EventEmitter {
     // It likely returns one JSON object and then closes, or maybe streams more.
     // We'll parse it as JSON.
     return res.json() as Promise<Message>;
+  }
+
+  private async triggerAlternativeRetry(sessionID: string, reason: string) {
+    const lastPrompt = this.lastUserPrompts.get(sessionID);
+    if (!lastPrompt) return;
+
+    const models = this.sessionModels.get(sessionID);
+    if (!models || !models.current) return;
+
+    const modelName = models.current.modelID || 'alternative model';
+    
+    this.emit('session.retrying_alternative', {
+      sessionID,
+      model: models.current,
+      text: lastPrompt.text,
+      reason
+    });
+
+    console.log(`[Octools] Automatically retrying last prompt with alternative model: ${modelName}`);
+    
+    try {
+      // Use sendMessage which will automatically pick up the new models.current
+      await this.sendMessage(sessionID, lastPrompt.text, lastPrompt.options);
+    } catch (e) {
+      console.error(`[Octools] Failed to auto-retry with alternative model`, e);
+    }
   }
 
   public async sendMessageAndWait(sessionID: string, text: string): Promise<Message> {
