@@ -353,8 +353,11 @@ export class OctoolsClient extends EventEmitter {
       // Wait a bit for the session to settle
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Use sendMessage which will automatically pick up the new models.current
-      await this.sendMessage(sessionID, lastPrompt.text, lastPrompt.options);
+      // Use sendMessage without the original model option to ensure it uses models.current
+      const options = { ...lastPrompt.options };
+      delete options.model;
+      
+      await this.sendMessage(sessionID, lastPrompt.text, options);
     } catch (e) {
       console.error(`[Octools] Failed to auto-retry with alternative model`, e);
     }
