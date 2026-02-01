@@ -452,12 +452,27 @@ function connectWebSocket() {
                 break;
             case 'message.complete':
                 const finalID = data.messageID || data.id;
-                const finalContent = messageBuffer.get(finalID) || data.text;
+                let finalContent = messageBuffer.get(finalID);
+                
+                // If we don't have it in buffer, maybe it's in the message object (re-load or non-streaming)
+                if (!finalContent && data.message && data.message.text) {
+                    finalContent = data.message.text;
+                }
+                
                 removeStreamingMessage(finalID);
                 
                 // If the message has an error flag or special error prefix, we can handle it
-                const isError = data.isError || (finalContent && finalContent.startsWith('Error:'));
-                addMessage('assistant', finalContent, false, isError);
+                const msgError = data.message?.error;
+                const isError = data.isError || (finalContent && finalContent.startsWith('Error:')) || !!msgError;
+                
+                if (msgError && !finalContent) {
+                    finalContent = `❌ **Error**: ${msgError.message || 'Unknown error'}`;
+                    if (msgError.data?.message) {
+                        finalContent += `\n\n\`\`\`json\n${msgError.data.message}\n\`\`\``;
+                    }
+                }
+
+                addMessage('assistant', finalContent || '(No content)', false, isError);
                 
                 messageBuffer.delete(finalID);
                 removeTypingIndicator('assistant-typing');
@@ -481,6 +496,15 @@ function connectWebSocket() {
                     showAuthError(data.error?.message || 'Authentication failed');
                 } else {
                     addEvent('Error', data);
+                    const errorMsg = data.error?.message || 'An unknown error occurred';
+                    let details = '';
+                    if (data.error?.data?.message) {
+                        details = data.error.data.message;
+                    } else if (data.error?.data) {
+                        details = JSON.stringify(data.error.data, null, 2);
+                    }
+                    
+                    addMessage('assistant', `❌ **API Error**\n\n${errorMsg}${details ? `\n\n\`\`\`json\n${details}\n\`\`\`` : ''}`, false, true);
                 }
                 break;
             case 'session.timeout':
