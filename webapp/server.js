@@ -81,9 +81,10 @@ app.get('/api/models', async (req, res) => {
 
 app.post('/api/session', async (req, res) => {
   try {
-    const { agent, model, directory } = req.body;
+    const { agent, secondaryAgent, model, directory } = req.body;
     const options = { directory: directory || '/root' };
     if (agent) options.agent = agent;
+    if (secondaryAgent) options.secondaryAgent = secondaryAgent;
     if (model) options.model = model;
     
     const session = await octoolsClient.createSession(options);
@@ -221,6 +222,11 @@ wss.on('connection', (ws) => {
     'session.error.auth': (data) => {
       if (currentSessionID === data.sessionID) {
         ws.send(JSON.stringify({ type: 'session.error.auth', data }));
+      }
+    },
+    'session.agent_switched': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.agent_switched', data }));
       }
     },
     'error': (error) => {

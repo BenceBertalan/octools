@@ -18,6 +18,7 @@ export class OctoolsClient extends EventEmitter {
   private lastServerHeartbeat: number = 0;
   private lastAIActivity: Map<string, number> = new Map();
   private sessionStatuses: Map<string, SessionStatusType> = new Map();
+  private sessionAgents: Map<string, { primary: string; secondary?: string; current: string }> = new Map();
   public rawEvents: { timestamp: number; payload: any }[] = [];
   private static MAX_LOGS = 2000;
 
@@ -96,6 +97,19 @@ export class OctoolsClient extends EventEmitter {
           
           if (status.type === 'busy' || status.type === 'retry') {
              this.recordAIActivity(sessionID);
+          }
+
+          // Secondary agent switching logic
+          if (status.type === 'error' || status.type === 'retry') {
+            const agents = this.sessionAgents.get(sessionID);
+            if (agents && agents.secondary && agents.current !== agents.secondary) {
+              agents.current = agents.secondary;
+              this.emit('session.agent_switched', {
+                sessionID,
+                agent: agents.secondary,
+                reason: status.type
+              });
+            }
           }
           
           this.emit('session.status', { sessionID, status: status.type, prevStatus, details: status });
@@ -176,11 +190,24 @@ export class OctoolsClient extends EventEmitter {
                });
              }
              
-             this.emit('session.error', {
-               sessionID: properties.sessionID,
-               error: error,
-               isAuthError
-             });
+              this.emit('session.error', {
+                sessionID: properties.sessionID,
+                error: error,
+                isAuthError
+              });
+
+              // Secondary agent switching logic for errors
+              if (properties.sessionID) {
+                const agents = this.sessionAgents.get(properties.sessionID);
+                if (agents && agents.secondary && agents.current !== agents.secondary) {
+                  agents.current = agents.secondary;
+                  this.emit('session.agent_switched', {
+                    sessionID: properties.sessionID,
+                    agent: agents.secondary,
+                    reason: 'error'
+                  });
+                }
+              }
           }
           break;
 
@@ -213,6 +240,7 @@ export class OctoolsClient extends EventEmitter {
   public async createSession(options?: { 
     title?: string;
     agent?: string;
+    secondaryAgent?: string;
     directory?: string;
     model?: { providerID: string; modelID: string };
   }): Promise<Session> {
@@ -227,7 +255,16 @@ export class OctoolsClient extends EventEmitter {
       }
       throw new Error(`Failed to create session: ${res.statusText}`);
     }
-    return res.json() as Promise<Session>;
+    const session = await res.json() as Session;
+    
+    // Store agent config
+    this.sessionAgents.set(session.id, {
+      primary: options?.agent || 'agent',
+      secondary: options?.secondaryAgent,
+      current: options?.agent || 'agent'
+    });
+
+    return session;
   }
 
   public async loadSession(sessionID: string): Promise<Session> {
@@ -256,12 +293,15 @@ export class OctoolsClient extends EventEmitter {
     agent?: string; 
     model?: { providerID: string; modelID: string } 
   }): Promise<Message> {
+    const agents = this.sessionAgents.get(sessionID);
+    const activeAgent = options?.agent || agents?.current || 'agent';
+
     const res = await fetch(`${this.config.baseUrl}/session/${sessionID}/message`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ 
         parts: [{ type: 'text', text }],
-        agent: options?.agent,
+        agent: activeAgent,
         model: options?.model
       })
     });

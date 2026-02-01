@@ -19,6 +19,8 @@ export interface Session {
   title?: string;
   directory?: string;
   projectID?: string;
+  agent?: string;
+  secondaryAgent?: string;
   time: {
     created: number;
     updated: number;

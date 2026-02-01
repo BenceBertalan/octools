@@ -606,6 +606,18 @@ input:checked + .slider:before {
     margin: 10px 0;
 }
 
+.message-bubble.info-blue {
+    background: #e7f3ff;
+    color: #0084ff;
+    border: 1px solid #0084ff33;
+    align-self: center;
+    max-width: 90%;
+    font-size: 13px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 10px 0;
+}
+
 body.dark .message-bubble.error {
     background: #2c1a1a;
     color: #ff8a80;
@@ -616,6 +628,12 @@ body.dark .message-bubble.warning {
     background: #2c251a;
     color: #ffcc80;
     border-color: #5c4d26;
+}
+
+body.dark .message-bubble.info-blue {
+    background: #1a2c3e;
+    color: #80c4ff;
+    border-color: #26465c;
 }
 
 body.hide-reasoning .message-bubble.reasoning {

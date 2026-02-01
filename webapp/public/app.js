@@ -25,6 +25,7 @@ const logsContainer = document.getElementById('logsContainer');
 const logCount = document.getElementById('logCount');
 const refreshLogsBtn = document.getElementById('refreshLogs');
 const agentSelect = document.getElementById('agentSelect');
+const secondaryAgentSelect = document.getElementById('secondaryAgentSelect');
 const modelSelect = document.getElementById('modelSelect');
 const directoryInput = document.getElementById('directoryInput');
 const createSessionBtn = document.getElementById('createSessionBtn');
@@ -215,7 +216,7 @@ async function sendMessage() {
     }
 }
 
-function addMessage(role, text, isQuestion = false, isError = false, isWarning = false) {
+function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false) {
     console.log(`[UI] addMessage: role=${role}, text=${text?.substring(0, 30)}...`);
     
     if (!text) return;
@@ -231,6 +232,9 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     }
     if (isWarning) {
         bubble.classList.add('warning');
+    }
+    if (isInfo) {
+        bubble.classList.add('info-blue');
     }
     
     bubble.innerHTML = marked.parse(text);
@@ -501,6 +505,9 @@ function connectWebSocket() {
             case 'session.error.auth':
                 showAuthError(data.error?.message || 'Authentication failed');
                 break;
+            case 'session.agent_switched':
+                addMessage('assistant', `🔄 **Agent Switched**: Now using **${data.agent}** (Reason: ${data.reason})`, false, false, false, true);
+                break;
             case 'session.error':
                 // Fallback if not caught by specific event but has 401 status
                 if (data.error?.statusCode === 401 || data.isAuthError) {
@@ -580,6 +587,17 @@ async function loadAgentsAndModels() {
 
         populateAgents(agentSelect);
         populateAgents(qsAgentSelect);
+        
+        secondaryAgentSelect.innerHTML = '<option value="">Secondary Agent: None</option>';
+        if (Array.isArray(agents)) {
+            agents.forEach(agent => {
+                const option = document.createElement('option');
+                option.value = agent;
+                option.textContent = agent;
+                secondaryAgentSelect.appendChild(option);
+            });
+        }
+
         populateModels(modelSelect);
         populateModels(qsModelSelect);
 
@@ -603,6 +621,7 @@ async function loadAgentsAndModels() {
 
 createSessionBtn.addEventListener('click', async () => {
     const agent = agentSelect.value || undefined;
+    const secondaryAgent = secondaryAgentSelect.value || undefined;
     const modelStr = modelSelect.value;
     const model = modelStr ? JSON.parse(modelStr) : undefined;
     const directory = directoryInput.value || '/root';
@@ -612,7 +631,7 @@ createSessionBtn.addEventListener('click', async () => {
         const response = await fetch('/api/session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent, model, directory })
+            body: JSON.stringify({ agent, secondaryAgent, model, directory })
         });
         
         if (!response.ok) {
