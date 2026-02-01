@@ -594,10 +594,28 @@ input:checked + .slider:before {
     margin: 10px 0;
 }
 
+.message-bubble.warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+    align-self: center;
+    max-width: 90%;
+    font-size: 13px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 10px 0;
+}
+
 body.dark .message-bubble.error {
     background: #2c1a1a;
     color: #ff8a80;
     border-color: #5c2626;
+}
+
+body.dark .message-bubble.warning {
+    background: #2c251a;
+    color: #ffcc80;
+    border-color: #5c4d26;
 }
 
 body.hide-reasoning .message-bubble.reasoning {

@@ -215,7 +215,7 @@ async function sendMessage() {
     }
 }
 
-function addMessage(role, text, isQuestion = false, isError = false) {
+function addMessage(role, text, isQuestion = false, isError = false, isWarning = false) {
     console.log(`[UI] addMessage: role=${role}, text=${text?.substring(0, 30)}...`);
     
     if (!text) return;
@@ -228,6 +228,9 @@ function addMessage(role, text, isQuestion = false, isError = false) {
     }
     if (isError) {
         bubble.classList.add('error');
+    }
+    if (isWarning) {
+        bubble.classList.add('warning');
     }
     
     bubble.innerHTML = marked.parse(text);
@@ -435,6 +438,12 @@ function connectWebSocket() {
                 updateStatus(data.type, `Session: ${data.sessionID.substring(0, 8)} (${data.type})`);
                 if (data.type === 'busy') addTypingIndicator('assistant-typing');
                 else if (data.type === 'idle') removeTypingIndicator('assistant-typing');
+                else if (data.type === 'retry') {
+                    const retryMsg = data.message || 'Retrying...';
+                    const attempt = data.attempt ? ` (Attempt ${data.attempt})` : '';
+                    const next = data.next ? ` Next try at ${new Date(data.next).toLocaleTimeString()}` : '';
+                    addMessage('assistant', `⚠️ **Retry**: ${retryMsg}${attempt}${next}`, false, false, true);
+                }
                 break;
             case 'message.delta':
             case 'message.part':
