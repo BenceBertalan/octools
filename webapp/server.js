@@ -169,8 +169,9 @@ wss.on('connection', (ws) => {
       if (currentSessionID === data.sessionID) {
         const monitor = sessions.get(data.sessionID);
         if (monitor) {
-          monitor.status = data.type;
-          if (data.type === 'busy' || data.type === 'idle') {
+          const sessionStatus = data.status || data.type;
+          monitor.status = sessionStatus;
+          if (sessionStatus === 'busy' || sessionStatus === 'idle') {
             monitor.lastActivity = Date.now();
           }
         }

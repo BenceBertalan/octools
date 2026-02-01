@@ -435,13 +435,15 @@ function connectWebSocket() {
         
         switch (type) {
             case 'session.status':
-                updateStatus(data.type, `Session: ${data.sessionID.substring(0, 8)} (${data.type})`);
-                if (data.type === 'busy') addTypingIndicator('assistant-typing');
-                else if (data.type === 'idle') removeTypingIndicator('assistant-typing');
-                else if (data.type === 'retry') {
-                    const retryMsg = data.message || 'Retrying...';
-                    const attempt = data.attempt ? ` (Attempt ${data.attempt})` : '';
-                    const next = data.next ? ` Next try at ${new Date(data.next).toLocaleTimeString()}` : '';
+                const sessionStatus = data.status || data.type;
+                updateStatus(sessionStatus, `Session: ${data.sessionID.substring(0, 8)} (${sessionStatus})`);
+                if (sessionStatus === 'busy') addTypingIndicator('assistant-typing');
+                else if (sessionStatus === 'idle') removeTypingIndicator('assistant-typing');
+                else if (sessionStatus === 'retry') {
+                    const details = data.details || {};
+                    const retryMsg = details.message || data.message || 'Retrying...';
+                    const attempt = details.attempt || data.attempt ? ` (Attempt ${details.attempt || data.attempt})` : '';
+                    const next = details.next || data.next ? ` Next try at ${new Date(details.next || data.next).toLocaleTimeString()}` : '';
                     addMessage('assistant', `⚠️ **Retry**: ${retryMsg}${attempt}${next}`, false, false, true);
                 }
                 break;
