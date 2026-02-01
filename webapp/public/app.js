@@ -562,8 +562,8 @@ async function loadAgentsAndModels() {
             }
         };
 
-        const populateModels = (select) => {
-            select.innerHTML = '<option value="">Model: Default</option>';
+        const populateModels = (select, label = "Model: Default") => {
+            select.innerHTML = `<option value="">${label}</option>`;
             if (Array.isArray(models)) {
                 // Group by provider
                 const providers = {};
@@ -576,51 +576,27 @@ async function loadAgentsAndModels() {
                     const group = document.createElement('optgroup');
                     group.label = providerID;
                     providers[providerID].forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = JSON.stringify({ providerID: model.providerID, modelID: model.modelID });
-                    option.textContent = model.name;
-                    group.appendChild(option);
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify({ providerID: model.providerID, modelID: model.modelID });
+                        option.textContent = model.name;
+                        group.appendChild(option);
+                    });
+                    select.appendChild(group);
                 });
-                select.appendChild(group);
-            });
-        }
-    };
+            }
+        };
 
         populateAgents(agentSelect);
         populateAgents(qsAgentSelect);
         
-        secondaryAgentSelect.innerHTML = '<option value="">Secondary Agent: None</option>';
-        if (Array.isArray(agents)) {
-            agents.forEach(agent => {
-                const option = document.createElement('option');
-                option.value = agent;
-                option.textContent = agent;
-                secondaryAgentSelect.appendChild(option);
-            });
-        }
-
         populateModels(modelSelect);
-        
-        secondaryModelSelect.innerHTML = '<option value="">Secondary Model: None</option>';
-        if (Array.isArray(models)) {
-            // Group by provider
-            const providers = {};
-            models.forEach(model => {
-                if (!providers[model.providerID]) providers[model.providerID] = [];
-                providers[model.providerID].push(model);
-            });
+        populateModels(qsModelSelect);
+        populateModels(secondaryModelSelect, "Secondary Model: None");
 
-            Object.keys(providers).forEach(providerID => {
-                const group = document.createElement('optgroup');
-                group.label = providerID;
-                providers[providerID].forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = JSON.stringify({ providerID: model.providerID, modelID: model.modelID });
-                    option.textContent = model.name;
-                    group.appendChild(option);
-                });
-                secondaryModelSelect.appendChild(group);
-            });
+        const favAgent = getCookie('favAgent');
+        if (favAgent) {
+            agentSelect.value = favAgent;
+            qsAgentSelect.value = favAgent;
         }
 
         const favModel = getCookie('favModel');
