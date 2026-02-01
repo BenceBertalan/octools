@@ -67,6 +67,23 @@ export interface SubagentProgress {
   status: 'pending' | 'running' | 'completed' | 'error';
 }
 
+export class AuthError extends Error {
+  constructor(public message: string, public details?: any) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+export interface SessionErrorEvent {
+  sessionID: string;
+  error: {
+    message: string;
+    name?: string;
+    data?: any;
+    [key: string]: any;
+  };
+}
+
 export interface Message {
   info: MessageInfo;
   parts: MessagePart[];

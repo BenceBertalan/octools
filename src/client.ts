@@ -7,7 +7,9 @@ import {
   SessionStatus, 
   SessionStatusType,
   Message, 
-  BusEvent 
+  BusEvent,
+  AuthError,
+  SessionErrorEvent
 } from './types';
 
 export class OctoolsClient extends EventEmitter {
@@ -151,6 +153,27 @@ export class OctoolsClient extends EventEmitter {
           }
           break;
 
+        case 'session.error':
+          if (properties.sessionID && properties.error) {
+             const error = properties.error;
+             // Check if it's an auth error (status 401 or specific name)
+             const isAuthError = error.statusCode === 401 || error.name === 'ProviderAuthError' || error.name === 'AuthError';
+             
+             if (isAuthError) {
+               this.emit('session.error.auth', {
+                 sessionID: properties.sessionID,
+                 error: new AuthError(error.message, error)
+               });
+             }
+             
+             this.emit('session.error', {
+               sessionID: properties.sessionID,
+               error: error,
+               isAuthError
+             });
+          }
+          break;
+
         default:
           // Emit raw event for debugging or other types
           this.emit('event', payload);
@@ -188,7 +211,12 @@ export class OctoolsClient extends EventEmitter {
       headers: this.headers,
       body: JSON.stringify(options || {})
     });
-    if (!res.ok) throw new Error(`Failed to create session: ${res.statusText}`);
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new AuthError('Authentication failed: Unauthorized');
+      }
+      throw new Error(`Failed to create session: ${res.statusText}`);
+    }
     return res.json() as Promise<Session>;
   }
 
@@ -228,6 +256,9 @@ export class OctoolsClient extends EventEmitter {
       })
     });
     if (!res.ok) {
+      if (res.status === 401) {
+        throw new AuthError('Authentication failed: Unauthorized');
+      }
       const errorText = await res.text();
       throw new Error(`Failed to send message: ${res.statusText} - ${errorText}`);
     }

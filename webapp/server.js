@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
-const { OctoolsClient } = require('../dist/index.js');
+const { OctoolsClient, AuthError } = require('../dist/index.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -94,7 +94,11 @@ app.post('/api/session', async (req, res) => {
     
     res.json(session);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    if (error instanceof AuthError || error.statusCode === 401 || error.message.includes('Authentication failed')) {
+      res.status(401).json({ error: 'Authentication failed', details: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 
@@ -103,7 +107,11 @@ app.get('/api/session/:sessionID', async (req, res) => {
     const session = await octoolsClient.loadSession(req.params.sessionID);
     res.json(session);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    if (error instanceof AuthError || error.statusCode === 401 || error.message.includes('Authentication failed')) {
+      res.status(401).json({ error: 'Authentication failed', details: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 
@@ -202,6 +210,16 @@ wss.on('connection', (ws) => {
     'subagent.progress': (data) => {
       if (currentSessionID === data.sessionID) {
         ws.send(JSON.stringify({ type: 'subagent.progress', data }));
+      }
+    },
+    'session.error': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.error', data }));
+      }
+    },
+    'session.error.auth': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.error.auth', data }));
       }
     },
     'error': (error) => {

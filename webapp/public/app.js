@@ -14,6 +14,9 @@ const settingsModal = document.getElementById('settingsModal');
 const closeSettings = document.getElementById('closeSettings');
 const questionModal = document.getElementById('questionModal');
 const closeQuestion = document.getElementById('closeQuestion');
+const authModal = document.getElementById('authModal');
+const closeAuth = document.getElementById('closeAuth');
+const authErrorDetails = document.getElementById('authErrorDetails');
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 const messagesContainer = document.getElementById('messagesContainer');
@@ -56,6 +59,16 @@ closeSettings.addEventListener('click', () => {
 closeQuestion.addEventListener('click', () => {
     questionModal.classList.remove('active');
 });
+
+closeAuth.addEventListener('click', () => {
+    authModal.classList.remove('active');
+});
+
+function showAuthError(message) {
+    authErrorDetails.textContent = typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
+    authModal.classList.add('active');
+    updateStatus('error', 'Authentication Failed');
+}
 
 // Auto-resize textarea
 messageInput.addEventListener('input', () => {
@@ -177,6 +190,13 @@ async function sendMessage() {
         });
         
         if (!response.ok) {
+            if (response.status === 401) {
+                const error = await response.json();
+                showAuthError(error.details || error.error || 'Unauthorized');
+                removeTypingIndicator('assistant-typing');
+                sendBtn.disabled = false;
+                return;
+            }
             const error = await response.json();
             throw new Error(error.error || response.statusText);
         }
@@ -448,6 +468,17 @@ function connectWebSocket() {
             case 'subagent.progress':
                 updateSubagentProgress(data);
                 break;
+            case 'session.error.auth':
+                showAuthError(data.error?.message || 'Authentication failed');
+                break;
+            case 'session.error':
+                // Fallback if not caught by specific event but has 401 status
+                if (data.error?.statusCode === 401 || data.isAuthError) {
+                    showAuthError(data.error?.message || 'Authentication failed');
+                } else {
+                    addEvent('Error', data);
+                }
+                break;
             case 'session.timeout':
                 updateStatus('error', 'Session timed out');
                 alert('Session timed out. Please create a new one.');
@@ -544,6 +575,18 @@ createSessionBtn.addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ agent, model, directory })
         });
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                const error = await response.json();
+                showAuthError(error.details || error.error || 'Unauthorized');
+                settingsModal.classList.remove('active');
+                return;
+            }
+            const error = await response.json();
+            throw new Error(error.error || response.statusText);
+        }
+
         currentSession = await response.json();
         if (ws?.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
