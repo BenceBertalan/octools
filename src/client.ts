@@ -346,6 +346,13 @@ export class OctoolsClient extends EventEmitter {
     console.log(`[Octools] Automatically retrying last prompt with alternative model: ${modelName}`);
     
     try {
+      // Abort first to stop the current stuck retry/generation
+      console.log(`[Octools] Aborting session ${sessionID} before alternative retry`);
+      await this.abortSession(sessionID).catch(e => console.warn(`[Octools] Abort failed (might already be stopped):`, e.message));
+      
+      // Wait a bit for the session to settle
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Use sendMessage which will automatically pick up the new models.current
       await this.sendMessage(sessionID, lastPrompt.text, lastPrompt.options);
     } catch (e) {
@@ -418,6 +425,14 @@ export class OctoolsClient extends EventEmitter {
       body: JSON.stringify({ answers })
     });
     if (!res.ok) throw new Error(`Failed to reply to question: ${res.statusText}`);
+  }
+
+  public async abortSession(sessionID: string): Promise<void> {
+    const res = await fetch(`${this.config.baseUrl}/session/${sessionID}/abort`, {
+      method: 'POST',
+      headers: this.headers
+    });
+    if (!res.ok) throw new Error(`Failed to abort session: ${res.statusText}`);
   }
 
   public async grantPermission(requestID: string, approved: boolean): Promise<void> {
