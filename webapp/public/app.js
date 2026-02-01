@@ -21,6 +21,9 @@ const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 const messagesContainer = document.getElementById('messagesContainer');
 const eventsContainer = document.getElementById('eventsContainer');
+const logsContainer = document.getElementById('logsContainer');
+const logCount = document.getElementById('logCount');
+const refreshLogsBtn = document.getElementById('refreshLogs');
 const agentSelect = document.getElementById('agentSelect');
 const modelSelect = document.getElementById('modelSelect');
 const directoryInput = document.getElementById('directoryInput');
@@ -79,6 +82,7 @@ messageInput.addEventListener('input', () => {
 
 // Send message
 sendBtn.addEventListener('click', sendMessage);
+refreshLogsBtn.addEventListener('click', fetchLogs);
 messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -615,6 +619,42 @@ async function loadSessionHistory(sessionID) {
         }
     } catch (error) {
         console.error('History error:', error);
+    }
+}
+
+async function fetchLogs() {
+    try {
+        const url = currentSession ? `/api/logs?sessionID=${currentSession.id}` : '/api/logs';
+        const response = await fetch(url);
+        const logs = await response.json();
+        
+        logCount.textContent = `${logs.length} events`;
+        logsContainer.innerHTML = '';
+        
+        if (logs.length === 0) {
+            logsContainer.innerHTML = '<div class="log-item">No events found.</div>';
+            return;
+        }
+
+        logs.reverse().forEach(log => {
+            const item = document.createElement('div');
+            item.style.marginBottom = '8px';
+            item.style.padding = '8px';
+            item.style.background = 'var(--bg-light)';
+            item.style.borderRadius = '4px';
+            item.style.borderLeft = '3px solid #ccc';
+            
+            const time = new Date(log.timestamp).toLocaleTimeString() + '.' + (log.timestamp % 1000);
+            const type = log.payload.type;
+            
+            item.innerHTML = `
+                <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 4px;">[${time}] ${type}</div>
+                <pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">${JSON.stringify(log.payload.properties, null, 2)}</pre>
+            `;
+            logsContainer.appendChild(item);
+        });
+    } catch (error) {
+        console.error('Fetch logs error:', error);
     }
 }
 

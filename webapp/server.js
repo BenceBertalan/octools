@@ -255,6 +255,18 @@ wss.on('connection', (ws) => {
 });
 
 // Session monitoring loop
+app.get('/api/logs', (req, res) => {
+  const sessionID = req.query.sessionID;
+  if (sessionID) {
+    const logs = octoolsClient.rawEvents.filter(e => {
+      return e.payload && e.payload.properties && e.payload.properties.sessionID === sessionID;
+    });
+    res.json(logs);
+  } else {
+    res.json(octoolsClient.rawEvents);
+  }
+});
+
 setInterval(() => {
   const now = Date.now();
   

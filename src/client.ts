@@ -18,6 +18,8 @@ export class OctoolsClient extends EventEmitter {
   private lastServerHeartbeat: number = 0;
   private lastAIActivity: Map<string, number> = new Map();
   private sessionStatuses: Map<string, SessionStatusType> = new Map();
+  public rawEvents: { timestamp: number; payload: any }[] = [];
+  private static MAX_LOGS = 2000;
 
   constructor(config: ClientConfig) {
     super();
@@ -70,6 +72,14 @@ export class OctoolsClient extends EventEmitter {
     
     try {
       const payload: BusEvent = JSON.parse(event.data);
+      
+      // Raw logging
+      this.rawEvents.push({ timestamp: Date.now(), payload });
+      if (this.rawEvents.length > OctoolsClient.MAX_LOGS) {
+        this.rawEvents.shift();
+      }
+      this.emit('raw.event', payload);
+
       const { type, properties } = payload;
 
       // Map to high-level events and track Liveness
