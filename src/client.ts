@@ -18,7 +18,7 @@ export class OctoolsClient extends EventEmitter {
   private lastServerHeartbeat: number = 0;
   private lastAIActivity: Map<string, number> = new Map();
   private sessionStatuses: Map<string, SessionStatusType> = new Map();
-  private sessionAgents: Map<string, { primary: string; secondary?: string; current: string }> = new Map();
+  private sessionModels: Map<string, { primary: any; secondary?: any; current: any }> = new Map();
   public rawEvents: { timestamp: number; payload: any }[] = [];
   private static MAX_LOGS = 2000;
 
@@ -99,14 +99,14 @@ export class OctoolsClient extends EventEmitter {
              this.recordAIActivity(sessionID);
           }
 
-          // Secondary agent switching logic
+          // Secondary model switching logic
           if (status.type === 'error' || status.type === 'retry') {
-            const agents = this.sessionAgents.get(sessionID);
-            if (agents && agents.secondary && agents.current !== agents.secondary) {
-              agents.current = agents.secondary;
-              this.emit('session.agent_switched', {
+            const models = this.sessionModels.get(sessionID);
+            if (models && models.secondary && JSON.stringify(models.current) !== JSON.stringify(models.secondary)) {
+              models.current = models.secondary;
+              this.emit('session.model_switched', {
                 sessionID,
-                agent: agents.secondary,
+                model: models.secondary,
                 reason: status.type
               });
             }
@@ -196,14 +196,14 @@ export class OctoolsClient extends EventEmitter {
                 isAuthError
               });
 
-              // Secondary agent switching logic for errors
+              // Secondary model switching logic for errors
               if (properties.sessionID) {
-                const agents = this.sessionAgents.get(properties.sessionID);
-                if (agents && agents.secondary && agents.current !== agents.secondary) {
-                  agents.current = agents.secondary;
-                  this.emit('session.agent_switched', {
+                const models = this.sessionModels.get(properties.sessionID);
+                if (models && models.secondary && JSON.stringify(models.current) !== JSON.stringify(models.secondary)) {
+                  models.current = models.secondary;
+                  this.emit('session.model_switched', {
                     sessionID: properties.sessionID,
-                    agent: agents.secondary,
+                    model: models.secondary,
                     reason: 'error'
                   });
                 }
@@ -240,9 +240,9 @@ export class OctoolsClient extends EventEmitter {
   public async createSession(options?: { 
     title?: string;
     agent?: string;
-    secondaryAgent?: string;
     directory?: string;
     model?: { providerID: string; modelID: string };
+    secondaryModel?: { providerID: string; modelID: string };
   }): Promise<Session> {
     const res = await fetch(`${this.config.baseUrl}/session`, {
       method: 'POST',
@@ -257,11 +257,11 @@ export class OctoolsClient extends EventEmitter {
     }
     const session = await res.json() as Session;
     
-    // Store agent config
-    this.sessionAgents.set(session.id, {
-      primary: options?.agent || 'agent',
-      secondary: options?.secondaryAgent,
-      current: options?.agent || 'agent'
+    // Store model config
+    this.sessionModels.set(session.id, {
+      primary: options?.model,
+      secondary: options?.secondaryModel,
+      current: options?.model
     });
 
     return session;
@@ -293,16 +293,16 @@ export class OctoolsClient extends EventEmitter {
     agent?: string; 
     model?: { providerID: string; modelID: string } 
   }): Promise<Message> {
-    const agents = this.sessionAgents.get(sessionID);
-    const activeAgent = options?.agent || agents?.current || 'agent';
+    const models = this.sessionModels.get(sessionID);
+    const activeModel = options?.model || models?.current;
 
     const res = await fetch(`${this.config.baseUrl}/session/${sessionID}/message`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ 
         parts: [{ type: 'text', text }],
-        agent: activeAgent,
-        model: options?.model
+        agent: options?.agent,
+        model: activeModel
       })
     });
     if (!res.ok) {

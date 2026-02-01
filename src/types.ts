@@ -20,7 +20,8 @@ export interface Session {
   directory?: string;
   projectID?: string;
   agent?: string;
-  secondaryAgent?: string;
+  model?: { providerID: string; modelID: string };
+  secondaryModel?: { providerID: string; modelID: string };
   time: {
     created: number;
     updated: number;

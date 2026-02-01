@@ -25,8 +25,8 @@ const logsContainer = document.getElementById('logsContainer');
 const logCount = document.getElementById('logCount');
 const refreshLogsBtn = document.getElementById('refreshLogs');
 const agentSelect = document.getElementById('agentSelect');
-const secondaryAgentSelect = document.getElementById('secondaryAgentSelect');
 const modelSelect = document.getElementById('modelSelect');
+const secondaryModelSelect = document.getElementById('secondaryModelSelect');
 const directoryInput = document.getElementById('directoryInput');
 const createSessionBtn = document.getElementById('createSessionBtn');
 const qsAgentSelect = document.getElementById('qsAgentSelect');
@@ -505,8 +505,9 @@ function connectWebSocket() {
             case 'session.error.auth':
                 showAuthError(data.error?.message || 'Authentication failed');
                 break;
-            case 'session.agent_switched':
-                addMessage('assistant', `🔄 **Agent Switched**: Now using **${data.agent}** (Reason: ${data.reason})`, false, false, false, true);
+            case 'session.model_switched':
+                const modelName = data.model?.modelID || 'unknown model';
+                addMessage('assistant', `🔄 **Model Switched**: Now using **${modelName}** (Reason: ${data.reason})`, false, false, false, true);
                 break;
             case 'session.error':
                 // Fallback if not caught by specific event but has 401 status
@@ -599,13 +600,27 @@ async function loadAgentsAndModels() {
         }
 
         populateModels(modelSelect);
-        populateModels(qsModelSelect);
+        
+        secondaryModelSelect.innerHTML = '<option value="">Secondary Model: None</option>';
+        if (Array.isArray(models)) {
+            // Group by provider
+            const providers = {};
+            models.forEach(model => {
+                if (!providers[model.providerID]) providers[model.providerID] = [];
+                providers[model.providerID].push(model);
+            });
 
-        // Apply favorite agent/model from cookies after they are populated
-        const favAgent = getCookie('favAgent');
-        if (favAgent) {
-            agentSelect.value = favAgent;
-            qsAgentSelect.value = favAgent;
+            Object.keys(providers).forEach(providerID => {
+                const group = document.createElement('optgroup');
+                group.label = providerID;
+                providers[providerID].forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify({ providerID: model.providerID, modelID: model.modelID });
+                    option.textContent = model.name;
+                    group.appendChild(option);
+                });
+                secondaryModelSelect.appendChild(group);
+            });
         }
 
         const favModel = getCookie('favModel');
@@ -621,9 +636,10 @@ async function loadAgentsAndModels() {
 
 createSessionBtn.addEventListener('click', async () => {
     const agent = agentSelect.value || undefined;
-    const secondaryAgent = secondaryAgentSelect.value || undefined;
     const modelStr = modelSelect.value;
     const model = modelStr ? JSON.parse(modelStr) : undefined;
+    const secondaryModelStr = secondaryModelSelect.value;
+    const secondaryModel = secondaryModelStr ? JSON.parse(secondaryModelStr) : undefined;
     const directory = directoryInput.value || '/root';
     
     try {
@@ -631,7 +647,7 @@ createSessionBtn.addEventListener('click', async () => {
         const response = await fetch('/api/session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent, secondaryAgent, model, directory })
+            body: JSON.stringify({ agent, model, secondaryModel, directory })
         });
         
         if (!response.ok) {
