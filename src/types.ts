@@ -39,6 +39,9 @@ export interface MessageInfo {
   error?: any;
   parentID?: string;
   finish?: string;
+  agent?: string;
+  modelID?: string;
+  providerID?: string;
 }
 
 export interface MessagePart {

@@ -175,8 +175,12 @@ async function sendMessage() {
     messageInput.style.height = 'auto';
     sendBtn.disabled = true;
     
+    const agent = qsAgentSelect.value || undefined;
+    const modelStr = qsModelSelect.value;
+    const model = modelStr ? JSON.parse(modelStr) : undefined;
+
     // Add user message to UI
-    addMessage('user', text);
+    addMessage('user', text, false, false, false, false, { agent, modelID: model?.modelID, providerID: model?.providerID });
     
     // Show typing indicator
     addTypingIndicator('assistant-typing');
@@ -184,10 +188,6 @@ async function sendMessage() {
     try {
         console.log(`Sending message to session ${currentSession.id}...`);
         
-        const agent = qsAgentSelect.value || undefined;
-        const modelStr = qsModelSelect.value;
-        const model = modelStr ? JSON.parse(modelStr) : undefined;
-
         const response = await fetch(`/api/session/${currentSession.id}/message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -216,13 +216,28 @@ async function sendMessage() {
     }
 }
 
-function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false) {
+function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}) {
     console.log(`[UI] addMessage: role=${role}, text=${text?.substring(0, 30)}...`);
     
     if (!text) return;
 
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${role}`;
+    
+    if (metadata.agent || metadata.modelID) {
+        const infoBar = document.createElement('div');
+        infoBar.className = 'message-info-bar';
+        const agentName = metadata.agent || 'Default';
+        const modelName = metadata.modelID ? `${metadata.providerID ? metadata.providerID + '/' : ''}${metadata.modelID}` : '';
+        infoBar.innerHTML = `<span>🤖 ${agentName}</span>${modelName ? `<span class="model-tag">🧠 ${modelName}</span>` : ''}`;
+        bubble.appendChild(infoBar);
+    }
+
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    content.innerHTML = marked.parse(text);
+    bubble.appendChild(content);
+
     if (isQuestion) {
         bubble.classList.add('question');
         bubble.onclick = () => openQuestionModal(currentQuestion);
@@ -237,7 +252,6 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
         bubble.classList.add('info-blue');
     }
     
-    bubble.innerHTML = marked.parse(text);
     messagesContainer.appendChild(bubble);
     
     const time = document.createElement('div');
@@ -248,17 +262,31 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-function updateStreamingMessage(messageID, text, isReasoning = false) {
+function updateStreamingMessage(messageID, text, isReasoning = false, metadata = {}) {
     let streamMsg = document.getElementById('stream-' + messageID);
     if (!streamMsg) {
         streamMsg = document.createElement('div');
         streamMsg.id = 'stream-' + messageID;
         streamMsg.className = 'message-bubble assistant';
         if (isReasoning) streamMsg.classList.add('reasoning');
+        
+        if (metadata.agent || metadata.modelID) {
+            const infoBar = document.createElement('div');
+            infoBar.className = 'message-info-bar';
+            const agentName = metadata.agent || 'Default';
+            const modelName = metadata.modelID ? `${metadata.providerID ? metadata.providerID + '/' : ''}${metadata.modelID}` : '';
+            infoBar.innerHTML = `<span>🤖 ${agentName}</span>${modelName ? `<span class="model-tag">🧠 ${modelName}</span>` : ''}`;
+            streamMsg.appendChild(infoBar);
+        }
+
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        streamMsg.appendChild(content);
         messagesContainer.appendChild(streamMsg);
     }
     
-    streamMsg.innerHTML = marked.parse(text);
+    const content = streamMsg.querySelector('.message-content') || streamMsg;
+    content.innerHTML = marked.parse(text);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -456,20 +484,22 @@ function connectWebSocket() {
                 const msgID = data.messageID || data.id;
                 
                 // Special handling for reasoning parts
-                // The part info might be in data.part (from message.part.updated) or data.parts (from message.updated)
                 const part = data.part || (data.parts && data.parts[0]);
                 const isReasoning = part?.type === 'reasoning';
+                
+                // Try to get metadata from message info if available
+                const msgMeta = data.message || {};
                 
                 let fullText = messageBuffer.get(msgID) || '';
                 fullText += (data.delta || data.text || '');
                 messageBuffer.set(msgID, fullText);
-                updateStreamingMessage(msgID, fullText, isReasoning);
+                updateStreamingMessage(msgID, fullText, isReasoning, msgMeta);
                 break;
             case 'message.complete':
                 const finalID = data.messageID || data.id;
                 let finalContent = messageBuffer.get(finalID);
                 
-                // If we don't have it in buffer, maybe it's in the message object (re-load or non-streaming)
+                // If we don't have it in buffer, maybe it's in the message object
                 if (!finalContent && data.message && data.message.text) {
                     finalContent = data.message.text;
                 }
@@ -487,7 +517,7 @@ function connectWebSocket() {
                     }
                 }
 
-                addMessage('assistant', finalContent || '(No content)', false, isError);
+                addMessage('assistant', finalContent || '(No content)', false, isError, false, false, data.message || {});
                 
                 messageBuffer.delete(finalID);
                 removeTypingIndicator('assistant-typing');
@@ -660,7 +690,7 @@ async function loadSessionHistory(sessionID) {
             messagesContainer.innerHTML = '';
             messages.forEach(msg => {
                 const text = msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n');
-                if (text) addMessage(msg.info.role, text);
+                if (text) addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info);
             });
         }
     } catch (error) {
