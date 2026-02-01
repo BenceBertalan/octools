@@ -116,9 +116,20 @@ app.get('/api/session/:sessionID', async (req, res) => {
   }
 });
 
+app.get('/api/sessions', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const sessions = await octoolsClient.listSessions({ limit });
+    res.json(sessions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/session/:sessionID/messages', async (req, res) => {
   try {
-    const messages = await octoolsClient.getMessages(req.params.sessionID);
+    const limit = req.query.limit ? parseInt(req.query.limit) : undefined;
+    const messages = await octoolsClient.getMessages(req.params.sessionID, { limit });
     res.json(messages);
   } catch (error) {
     res.status(500).json({ error: error.message });

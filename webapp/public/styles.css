@@ -481,6 +481,50 @@ body.dark .model-tag {
     color: #65676b;
 }
 
+/* Session List */
+.session-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.session-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.session-item:hover {
+    background: #f0f2f5;
+}
+
+body.dark .session-item:hover {
+    background: #3a3b3c;
+}
+
+.session-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70%;
+}
+
+.session-item-date {
+    font-size: 11px;
+    color: #90949c;
+}
+
 /* Events Container */
 .events-container {
     flex: 1;

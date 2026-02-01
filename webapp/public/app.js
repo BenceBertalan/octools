@@ -31,6 +31,7 @@ const directoryInput = document.getElementById('directoryInput');
 const createSessionBtn = document.getElementById('createSessionBtn');
 const qsAgentSelect = document.getElementById('qsAgentSelect');
 const qsModelSelect = document.getElementById('qsModelSelect');
+const sessionList = document.getElementById('sessionList');
 const hideReasoningCheckbox = document.getElementById('hideReasoning');
 const darkThemeCheckbox = document.getElementById('darkTheme');
 const submitAnswer = document.getElementById('submitAnswer');
@@ -54,6 +55,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // Modal controls
 settingsBtn.addEventListener('click', () => {
     settingsModal.classList.add('active');
+    loadExistingSessions();
 });
 
 closeSettings.addEventListener('click', () => {
@@ -693,9 +695,59 @@ createSessionBtn.addEventListener('click', async () => {
     }
 });
 
-async function loadSessionHistory(sessionID) {
+async function loadExistingSessions() {
     try {
-        const response = await fetch(`/api/session/${sessionID}/messages`);
+        sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: #90949c;">Loading sessions...</div>';
+        const response = await fetch('/api/sessions?limit=20');
+        const sessions = await response.json();
+        
+        sessionList.innerHTML = '';
+        if (sessions.length === 0) {
+            sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: #90949c;">No sessions found</div>';
+            return;
+        }
+
+        sessions.forEach(session => {
+            const item = document.createElement('div');
+            item.className = 'session-item';
+            
+            const title = session.title || session.id.substring(0, 12);
+            const date = new Date(session.time.updated).toLocaleDateString(undefined, { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+
+            item.innerHTML = `
+                <div class="session-item-title">${title}</div>
+                <div class="session-item-date">${date}</div>
+            `;
+
+            item.onclick = () => connectToSession(session);
+            sessionList.appendChild(item);
+        });
+    } catch (error) {
+        console.error('List sessions error:', error);
+        sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--error-color);">Failed to load sessions</div>';
+    }
+}
+
+async function connectToSession(session) {
+    currentSession = session;
+    if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
+    }
+    updateStatus('idle', `Session: ${session.id.substring(0, 8)}`);
+    settingsModal.classList.remove('active');
+    messagesContainer.innerHTML = '';
+    addMessage('assistant', `Connected to session: **${session.title || session.id}**`);
+    loadSessionHistory(session.id, 20);
+}
+
+async function loadSessionHistory(sessionID, limit = 100) {
+    try {
+        const response = await fetch(`/api/session/${sessionID}/messages?limit=${limit}`);
         const messages = await response.json();
         if (Array.isArray(messages) && messages.length > 0) {
             messagesContainer.innerHTML = '';
@@ -755,7 +807,10 @@ async function init() {
         connectWebSocket();
         await loadAgentsAndModels();
         setTimeout(() => {
-            if (!currentSession) settingsModal.classList.add('active');
+            if (!currentSession) {
+                settingsModal.classList.add('active');
+                loadExistingSessions();
+            }
         }, 500);
     } catch (err) {
         addEvent('Error', 'Init failed: ' + err.message);

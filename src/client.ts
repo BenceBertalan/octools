@@ -278,6 +278,18 @@ export class OctoolsClient extends EventEmitter {
     return res.json() as Promise<Session>;
   }
 
+  public async listSessions(options?: { limit?: number; directory?: string }): Promise<Session[]> {
+    const url = new URL(`${this.config.baseUrl}/session`);
+    if (options?.limit) url.searchParams.set('limit', options.limit.toString());
+    if (options?.directory) url.searchParams.set('directory', options.directory);
+
+    const res = await fetch(url.toString(), {
+      headers: this.headers
+    });
+    if (!res.ok) throw new Error(`Failed to list sessions: ${res.statusText}`);
+    return res.json() as Promise<Session[]>;
+  }
+
   public async getMessages(sessionID: string, options?: { limit?: number }): Promise<Message[]> {
      const url = new URL(`${this.config.baseUrl}/session/${sessionID}/message`);
      if (options?.limit) {
