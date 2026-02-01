@@ -293,6 +293,16 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
             }
         };
     }
+    
+    messagesContainer.appendChild(bubble);
+    
+    const time = document.createElement('div');
+    time.className = 'message-time';
+    time.textContent = new Date().toLocaleTimeString();
+    messagesContainer.appendChild(time);
+    
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
 
 function openQuestionModal(data) {
     if (!data || !data.questions || !data.questions[0]) return;
