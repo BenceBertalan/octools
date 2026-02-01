@@ -434,12 +434,18 @@ export class OctoolsClient extends EventEmitter {
   }
 
   public async replyToQuestion(requestID: string, answers: any[]): Promise<void> {
+    console.log(`[Octools] Replying to question ${requestID} with:`, JSON.stringify(answers));
     const res = await fetch(`${this.config.baseUrl}/question/${requestID}/reply`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ answers })
     });
-    if (!res.ok) throw new Error(`Failed to reply to question: ${res.statusText}`);
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`[Octools] Reply failed: ${res.status} ${res.statusText} - ${errorText}`);
+      throw new Error(`Failed to reply to question: ${res.statusText} - ${errorText}`);
+    }
+    console.log(`[Octools] Reply success`);
   }
 
   public async abortSession(sessionID: string): Promise<void> {

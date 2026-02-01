@@ -243,14 +243,17 @@ function removeStreamingMessage(messageID) {
 }
 
 function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null) {
-    console.log(`[UI] addMessage: role=${role}, text=${text?.substring(0, 30)}... isQuestion=${isQuestion}`);
+    console.log(`[UI] addMessage: role=${role}, isQuestion=${isQuestion}, text="${text?.substring(0, 30)}..."`);
     
-    if (!text) return;
+    if (!text) {
+        console.warn('[UI] addMessage: No text provided');
+        return;
+    }
 
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${role}`;
     
-    if (metadata.agent || metadata.modelID) {
+    if (metadata && (metadata.agent || metadata.modelID)) {
         const infoBar = document.createElement('div');
         infoBar.className = 'message-info-bar';
         const agentName = metadata.agent || 'Default';
@@ -270,77 +273,172 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     bubble.appendChild(content);
 
     if (isQuestion) {
+        console.log('[UI] addMessage: Handling as question-inline');
         bubble.classList.add('question-inline');
         const qData = questionData || currentQuestion;
         
         if (qData) {
             const questions = qData.questions || (qData.properties && qData.properties.questions);
-            if (questions && questions[0]) {
-                const q = questions[0];
-                const optionsDiv = document.createElement('div');
-                optionsDiv.className = 'question-options-inline';
-                
-                const selectedLabels = new Set();
+            console.log('[UI] Question data found:', !!questions);
+            if (questions && questions.length > 0) {
+                // Shared state for all questions in this bubble
+                const allAnswers = questions.map(() => new Set());
                 
                 const submitBtn = document.createElement('button');
                 submitBtn.className = 'submit-question-inline';
                 submitBtn.textContent = 'Submit Answer';
                 submitBtn.disabled = true;
 
-                q.options.forEach(option => {
-                    const optItem = document.createElement('div');
-                    optItem.className = 'option-item-inline';
-                    optItem.innerHTML = `<strong>${option.label}</strong><div style="font-size: 12px; opacity: 0.8">${option.description}</div>`;
+                const updateSubmitState = () => {
+                    // Enable if at least one option is selected in ANY question (or maybe ALL?)
+                    // Let's require all questions to have at least one selection if they are there
+                    const allAnswered = allAnswers.every(ans => ans.size > 0);
+                    submitBtn.disabled = !allAnswered;
+                };
+
+                if (questions.length > 1) {
+                    // Create Tabs
+                    const tabsContainer = document.createElement('div');
+                    tabsContainer.className = 'question-tabs';
                     
-                    optItem.onclick = () => {
-                        if (optItem.classList.contains('disabled')) return;
+                    const contentsContainer = document.createElement('div');
+                    contentsContainer.className = 'question-contents';
+
+                    questions.forEach((q, qIdx) => {
+                        const tabBtn = document.createElement('button');
+                        tabBtn.className = 'question-tab-btn' + (qIdx === 0 ? ' active' : '');
+                        tabBtn.textContent = q.header || `Q${qIdx + 1}`;
                         
-                        if (q.multiple) {
-                            if (selectedLabels.has(option.label)) {
-                                selectedLabels.delete(option.label);
-                                optItem.classList.remove('selected');
+                        const qContent = document.createElement('div');
+                        qContent.className = 'question-tab-content' + (qIdx === 0 ? ' active' : '');
+                        
+                        // Question Text
+                        const qText = document.createElement('p');
+                        qText.style.fontWeight = 'bold';
+                        qText.style.marginBottom = '8px';
+                        qText.textContent = q.question;
+                        qContent.appendChild(qText);
+
+                        const optionsDiv = document.createElement('div');
+                        optionsDiv.className = 'question-options-inline';
+                        
+                        q.options.forEach(option => {
+                            const optItem = document.createElement('div');
+                            optItem.className = 'option-item-inline';
+                            optItem.innerHTML = `<strong>${option.label}</strong><div style="font-size: 12px; opacity: 0.8">${option.description}</div>`;
+                            
+                            optItem.onclick = (e) => {
+                                e.stopPropagation();
+                                if (optItem.classList.contains('disabled')) return;
+                                
+                                if (q.multiple) {
+                                    if (allAnswers[qIdx].has(option.label)) {
+                                        allAnswers[qIdx].delete(option.label);
+                                        optItem.classList.remove('selected');
+                                    } else {
+                                        allAnswers[qIdx].add(option.label);
+                                        optItem.classList.add('selected');
+                                    }
+                                } else {
+                                    optionsDiv.querySelectorAll('.option-item-inline').forEach(i => i.classList.remove('selected'));
+                                    allAnswers[qIdx].clear();
+                                    allAnswers[qIdx].add(option.label);
+                                    optItem.classList.add('selected');
+                                }
+                                updateSubmitState();
+                            };
+                            optionsDiv.appendChild(optItem);
+                        });
+                        
+                        qContent.appendChild(optionsDiv);
+                        contentsContainer.appendChild(qContent);
+
+                        tabBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            tabsContainer.querySelectorAll('.question-tab-btn').forEach(b => b.classList.remove('active'));
+                            contentsContainer.querySelectorAll('.question-tab-content').forEach(c => c.classList.remove('active'));
+                            tabBtn.classList.add('active');
+                            qContent.classList.add('active');
+                        };
+                        tabsContainer.appendChild(tabBtn);
+                    });
+
+                    content.appendChild(tabsContainer);
+                    content.appendChild(contentsContainer);
+                } else {
+                    // Single question logic (keep it simple)
+                    const q = questions[0];
+                    const optionsDiv = document.createElement('div');
+                    optionsDiv.className = 'question-options-inline';
+                    
+                    q.options.forEach(option => {
+                        const optItem = document.createElement('div');
+                        optItem.className = 'option-item-inline';
+                        optItem.innerHTML = `<strong>${option.label}</strong><div style="font-size: 12px; opacity: 0.8">${option.description}</div>`;
+                        
+                        optItem.onclick = (e) => {
+                            e.stopPropagation();
+                            if (optItem.classList.contains('disabled')) return;
+                            
+                            if (q.multiple) {
+                                if (allAnswers[0].has(option.label)) {
+                                    allAnswers[0].delete(option.label);
+                                    optItem.classList.remove('selected');
+                                } else {
+                                    allAnswers[0].add(option.label);
+                                    optItem.classList.add('selected');
+                                }
                             } else {
-                                selectedLabels.add(option.label);
+                                optionsDiv.querySelectorAll('.option-item-inline').forEach(i => i.classList.remove('selected'));
+                                allAnswers[0].clear();
+                                allAnswers[0].add(option.label);
                                 optItem.classList.add('selected');
                             }
-                        } else {
-                            optionsDiv.querySelectorAll('.option-item-inline').forEach(i => i.classList.remove('selected'));
-                            selectedLabels.clear();
-                            selectedLabels.add(option.label);
-                            optItem.classList.add('selected');
-                        }
-                        submitBtn.disabled = selectedLabels.size === 0;
-                    };
-                    optionsDiv.appendChild(optItem);
-                });
-                
-                submitBtn.onclick = async () => {
+                            updateSubmitState();
+                        };
+                        optionsDiv.appendChild(optItem);
+                    });
+                    content.appendChild(optionsDiv);
+                }
+
+                submitBtn.onclick = async (e) => {
+                    e.stopPropagation();
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Submitting...';
                     
                     try {
                         const requestID = qData.id || qData.requestID || (qData.properties && qData.properties.id);
-                        const answers = Array.from(selectedLabels);
+                        const finalAnswers = allAnswers.map(set => Array.from(set));
                         
-                        await fetch(`/api/question/${requestID}/reply`, {
+                        console.log(`[UI] Submitting answers for ID ${requestID}:`, finalAnswers);
+                        const body = { sessionID: currentSession.id, answers: finalAnswers };
+                        
+                        const res = await fetch(`/api/question/${requestID}/reply`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ sessionID: currentSession.id, answers: [answers] })
+                            body: JSON.stringify(body)
                         });
                         
+                        if (!res.ok) {
+                            const errorData = await res.json().catch(() => ({ error: res.statusText }));
+                            throw new Error(errorData.error || 'Server rejected reply');
+                        }
+
                         submitBtn.textContent = 'Answered ✅';
-                        submitBtn.disabled = true;
-                        optionsDiv.querySelectorAll('.option-item-inline').forEach(i => i.classList.add('disabled'));
+                        bubble.querySelectorAll('.option-item-inline').forEach(i => i.classList.add('disabled'));
+                        bubble.querySelectorAll('.question-tab-btn').forEach(b => b.classList.add('disabled'));
                     } catch (error) {
                         console.error('Submit answer error:', error);
                         submitBtn.disabled = false;
                         submitBtn.textContent = 'Retry Submission';
+                        alert(`Failed to submit: ${error.message}`);
                     }
                 };
                 
-                content.appendChild(optionsDiv);
                 content.appendChild(submitBtn);
             }
+        } else {
+            console.warn('[UI] No qData for question bubble');
         }
     }
     
@@ -349,6 +447,7 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     if (isInfo) bubble.classList.add('info-blue');
     
     messagesContainer.appendChild(bubble);
+    console.log('[UI] Bubble appended to container');
     
     const time = document.createElement('div');
     time.className = 'message-time';
@@ -491,12 +590,12 @@ function connectWebSocket() {
         
         switch (type) {
             case 'session.status':
-                const sessionStatus = data.status || data.type;
+                const sessionStatus = (data.status && data.status.type) || data.status || data.type;
                 updateStatus(sessionStatus, `Session: ${data.sessionID.substring(0, 8)} (${sessionStatus})`);
                 if (sessionStatus === 'busy') addTypingIndicator('assistant-typing');
                 else if (sessionStatus === 'idle') removeTypingIndicator('assistant-typing');
                 else if (sessionStatus === 'retry') {
-                    const details = data.details || {};
+                    const details = data.status || data.details || {};
                     const retryMsg = details.message || data.message || 'Retrying...';
                     const attempt = details.attempt || data.attempt ? ` (Attempt ${details.attempt || data.attempt})` : '';
                     const next = details.next || data.next ? ` Next try at ${new Date(details.next || data.next).toLocaleTimeString()}` : '';
@@ -548,7 +647,10 @@ function connectWebSocket() {
                 break;
             case 'question':
                 currentQuestion = data;
-                showQuestionNotification(data);
+                const qText = (data.questions && data.questions[0] && data.questions[0].question) || 
+                              (data.properties && data.properties.questions && data.properties.questions[0] && data.properties.questions[0].question) ||
+                              '🤔 I have a question for you:';
+                addMessage('assistant', qText, true, false, false, false, {}, data);
                 break;
             case 'permission':
                 addMessage('assistant', '⚠️ Permission required. Check events.', true);

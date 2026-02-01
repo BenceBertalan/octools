@@ -249,7 +249,7 @@ body.dark .model-tag {
     border: 1px solid #c8e6c9;
     align-self: flex-start;
     border-bottom-left-radius: 4px;
-    width: 100%;
+    max-width: 90%;
 }
 
 body.dark .message-bubble.question-inline {
@@ -312,6 +312,48 @@ body.dark .option-item-inline {
     opacity: 0.5;
     cursor: not-allowed;
     background: #ccc;
+}
+
+/* Question Tabs */
+.question-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    padding-bottom: 4px;
+    overflow-x: auto;
+}
+
+body.dark .question-tabs {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.question-tab-btn {
+    padding: 4px 10px;
+    border: none;
+    background: none;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    color: #65676b;
+    white-space: nowrap;
+}
+
+body.dark .question-tab-btn {
+    color: #b0b3b8;
+}
+
+.question-tab-btn.active {
+    background: #2e7d32;
+    color: white;
+}
+
+.question-tab-content {
+    display: none;
+}
+
+.question-tab-content.active {
+    display: block;
 }
 
 .message-bubble.question {

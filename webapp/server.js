@@ -169,11 +169,13 @@ app.post('/api/session/:sessionID/abort', async (req, res) => {
 });
 
 app.post('/api/question/:requestID/reply', async (req, res) => {
+  console.log(`[API] Reply to question ${req.params.requestID}:`, JSON.stringify(req.body, null, 2));
   try {
-    const { sessionID, answers } = req.body;
-    await octoolsClient.replyToQuestion(req.params.requestID, sessionID, answers);
+    const { answers } = req.body;
+    await octoolsClient.replyToQuestion(req.params.requestID, answers);
     res.json({ success: true });
   } catch (error) {
+    console.error(`[API] Reply error:`, error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -190,7 +192,7 @@ wss.on('connection', (ws) => {
       if (currentSessionID === data.sessionID) {
         const monitor = sessions.get(data.sessionID);
         if (monitor) {
-          const sessionStatus = data.status || data.type;
+          const sessionStatus = (data.status && data.status.type) || data.status || data.type;
           monitor.status = sessionStatus;
           if (sessionStatus === 'busy' || sessionStatus === 'idle') {
             monitor.lastActivity = Date.now();
