@@ -538,6 +538,13 @@ function connectWebSocket() {
             case 'session.model_switched':
                 const modelName = data.model?.modelID || 'unknown model';
                 addMessage('assistant', `🔄 **Model Switched**: Now using **${modelName}** (Reason: ${data.reason})`, false, false, false, true);
+                
+                // Update dropdowns
+                if (data.model) {
+                    const modelVal = JSON.stringify({ providerID: data.model.providerID, modelID: data.model.modelID });
+                    qsModelSelect.value = modelVal;
+                    modelSelect.value = modelVal;
+                }
                 break;
             case 'session.retrying_alternative':
                 const altModelName = data.model?.modelID || 'unknown model';
