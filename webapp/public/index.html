@@ -30,12 +30,11 @@
         <!-- Tab Navigation -->
         <div class="tabs">
             <button class="tab-btn active" data-tab="chat">Chat</button>
+            <button class="tab-btn" data-tab="events">Events</button>
             <button class="tab-btn" data-tab="tools">
                 Tools
                 <span class="tab-indicator" id="toolsTabIndicator" style="display: none;"></span>
             </button>
-            <button class="tab-btn" data-tab="events">Events</button>
-            <button class="tab-btn" data-tab="logs">Logs</button>
         </div>
 
         <!-- Chat Tab -->
@@ -130,16 +129,6 @@
             </div>
         </div>
 
-        <!-- Logs Tab -->
-        <div class="tab-content" id="logsTab">
-            <div class="logs-controls" style="padding: 10px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <span id="logCount">0 events</span>
-                <button class="btn-primary" style="padding: 4px 12px; font-size: 12px;" id="refreshLogs">Refresh</button>
-            </div>
-            <div class="logs-container" id="logsContainer" style="flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 11px;">
-                <div class="log-item">No logs captured yet.</div>
-            </div>
-        </div>
     </div>
 
     <!-- Settings Modal -->
@@ -154,6 +143,7 @@
                 <button class="settings-tab-btn active" data-settings-tab="existing">Existing</button>
                 <button class="settings-tab-btn" data-settings-tab="new">New Session</button>
                 <button class="settings-tab-btn" data-settings-tab="preferences">Preferences</button>
+                <button class="settings-tab-btn" data-settings-tab="logs">Logs</button>
             </div>
 
             <div class="modal-body">
@@ -210,6 +200,16 @@
                         <small style="color: #90949c; font-size: 12px; margin-top: 4px; display: block;">
                             Use dark color scheme
                         </small>
+                    </div>
+                </div>
+
+                <div id="logsTab" class="settings-tab-content">
+                    <div class="logs-controls" style="padding: 10px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                        <span id="logCount">0 events</span>
+                        <button class="btn-primary" style="padding: 4px 12px; font-size: 12px;" id="refreshLogs">Refresh</button>
+                    </div>
+                    <div class="logs-container" id="logsContainer" style="max-height: 400px; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 11px;">
+                        <div class="log-item">No logs captured yet.</div>
                     </div>
                 </div>
             </div>
