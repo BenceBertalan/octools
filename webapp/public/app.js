@@ -249,6 +249,155 @@ function createReasoningSection(reasoningParts, messageID) {
     return section;
 }
 
+// Load more messages helper
+async function loadMoreMessages() {
+    if (!currentSession || loadingMore) return;
+    
+    const sessionID = currentSession.id;
+    let allMessages = messagesCache.get(sessionID);
+    
+    // If not cached, fetch all messages
+    if (!allMessages) {
+        loadingMore = true;
+        updateLoadMoreButton(true);
+        
+        try {
+            const response = await fetch(`/api/session/${sessionID}/messages`);
+            if (!response.ok) throw new Error('Failed to fetch messages');
+            allMessages = await safeJson(response) || [];
+            messagesCache.set(sessionID, allMessages);
+        } catch (e) {
+            console.error('Load more failed:', e);
+            addEvent('Error', 'Failed to load older messages: ' + e.message);
+            loadingMore = false;
+            updateLoadMoreButton(false);
+            return;
+        }
+    }
+    
+    // Get current oldest displayed index
+    let currentOldest = oldestDisplayedIndex.get(sessionID) ?? allMessages.length;
+    
+    // Calculate new oldest index (load 20 more)
+    const newOldest = Math.max(0, currentOldest - 20);
+    
+    if (newOldest === currentOldest) {
+        // No more messages to load
+        loadingMore = false;
+        updateLoadMoreButton(false);
+        return;
+    }
+    
+    // Get the messages to add
+    const messagesToAdd = allMessages.slice(newOldest, currentOldest);
+    
+    // Preserve scroll position
+    const oldScrollHeight = messagesContainer.scrollHeight;
+    const oldScrollTop = messagesContainer.scrollTop;
+    
+    // Add messages at the top (in reverse order since we're prepending)
+    const loadMoreBtn = document.querySelector('.load-more-container');
+    const insertPoint = loadMoreBtn ? loadMoreBtn.nextSibling : messagesContainer.firstChild;
+    
+    messagesToAdd.reverse().forEach(msg => {
+        const textParts = msg.parts.filter(p => p.type === 'text');
+        const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
+        const text = textParts.map(p => p.text).join('\n');
+        
+        if (text || reasoningParts.length > 0) {
+            // Create message bubble
+            const msgID = msg.info.id;
+            if (document.getElementById('msg-' + msgID)) return; // Skip if already exists
+            
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${msg.info.role}`;
+            bubble.id = 'msg-' + msgID;
+            
+            if (msg.info.agent || msg.info.modelID) {
+                const infoBar = document.createElement('div');
+                infoBar.className = 'message-info-bar';
+                const agentName = msg.info.agent || 'Default';
+                const modelName = msg.info.modelID ? `${msg.info.providerID ? msg.info.providerID + '/' : ''}${msg.info.modelID}` : '';
+                infoBar.innerHTML = `<span>🤖 ${agentName}</span>${modelName ? `<span class="model-tag">🧠 ${modelName}</span>` : ''}`;
+                bubble.appendChild(infoBar);
+            }
+            
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            try {
+                content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+            } catch (e) {
+                content.textContent = text;
+            }
+            bubble.appendChild(content);
+            
+            if (msg.info.error) bubble.classList.add('error');
+            
+            // Add reasoning section if present
+            if (reasoningParts.length > 0) {
+                const reasoningSection = createReasoningSection(reasoningParts, msgID);
+                if (reasoningSection) bubble.appendChild(reasoningSection);
+            }
+            
+            // Insert at the right position
+            messagesContainer.insertBefore(bubble, insertPoint);
+            
+            // Add timestamp
+            const time = document.createElement('div');
+            time.className = 'message-time';
+            time.textContent = new Date(msg.info.time.created).toLocaleTimeString();
+            messagesContainer.insertBefore(time, insertPoint);
+        }
+    });
+    
+    // Restore scroll position
+    const newScrollHeight = messagesContainer.scrollHeight;
+    messagesContainer.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+    
+    // Update state
+    oldestDisplayedIndex.set(sessionID, newOldest);
+    loadingMore = false;
+    
+    // Update button
+    updateLoadMoreButton(false, newOldest > 0);
+}
+
+function updateLoadMoreButton(loading, hasMore = true) {
+    let loadMoreContainer = document.querySelector('.load-more-container');
+    
+    if (!hasMore && loadMoreContainer) {
+        loadMoreContainer.remove();
+        return;
+    }
+    
+    if (!loadMoreContainer) {
+        loadMoreContainer = document.createElement('div');
+        loadMoreContainer.className = 'load-more-container';
+        
+        const btn = document.createElement('button');
+        btn.className = 'load-more-btn';
+        btn.onclick = loadMoreMessages;
+        
+        loadMoreContainer.appendChild(btn);
+        
+        // Insert at the top of messages container
+        if (messagesContainer.firstChild) {
+            messagesContainer.insertBefore(loadMoreContainer, messagesContainer.firstChild);
+        } else {
+            messagesContainer.appendChild(loadMoreContainer);
+        }
+    }
+    
+    const btn = loadMoreContainer.querySelector('.load-more-btn');
+    if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Loading earlier messages...';
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = '📜 Load Earlier Messages (20)';
+    }
+}
+
 async function sendMessage() {
     if (!currentSession) {
         alert('Please connect to a session first');
@@ -779,15 +928,33 @@ async function connectToSession(session) {
     console.log('[UI] Connecting to session:', session.id);
     currentSession = session;
     try {
-        const response = await fetch(`/api/session/${session.id}/messages?limit=20`);
+        // Fetch all messages without limit
+        const response = await fetch(`/api/session/${session.id}/messages`);
         if (!response.ok) throw new Error('Failed to fetch messages');
-        const messages = await safeJson(response) || [];
+        const allMessages = await safeJson(response) || [];
+        
+        // Cache messages
+        messagesCache.set(session.id, allMessages);
+        
+        // Determine how many to show initially (last 20)
+        const initialCount = Math.min(20, allMessages.length);
+        const startIndex = allMessages.length - initialCount;
+        const messagesToShow = allMessages.slice(startIndex);
+        
+        // Store oldest displayed index
+        oldestDisplayedIndex.set(session.id, startIndex);
         
         if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
         updateStatus('idle'); 
         if (settingsModal) settingsModal.classList.remove('active');
         if (messagesContainer) messagesContainer.innerHTML = '';
-        messages.forEach(msg => {
+        
+        // Add "Load More" button if there are more messages
+        if (startIndex > 0) {
+            updateLoadMoreButton(false, true);
+        }
+        
+        messagesToShow.forEach(msg => {
             const textParts = msg.parts.filter(p => p.type === 'text');
             const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
             const text = textParts.map(p => p.text).join('\n');
