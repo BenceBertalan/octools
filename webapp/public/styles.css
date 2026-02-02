@@ -2574,3 +2574,137 @@ body.dark .tool-section-title {
     color: #e0e0e0;
 }
 
+/* Favorites feature */
+.favorite-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0.3;
+    transition: opacity 0.2s, transform 0.2s;
+    padding: 4px;
+    line-height: 1;
+    z-index: 10;
+}
+
+.favorite-btn:hover {
+    opacity: 0.6;
+    transform: scale(1.1);
+}
+
+.favorite-btn.favorited {
+    opacity: 1;
+}
+
+.message-bubble {
+    position: relative;
+}
+
+.favorites-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.favorites-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #90949c;
+}
+
+.favorite-item {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.favorite-item:hover {
+    background: rgba(0, 132, 255, 0.05);
+}
+
+body.dark .favorite-item {
+    border-color: #404040;
+}
+
+body.dark .favorite-item:hover {
+    background: rgba(100, 181, 246, 0.1);
+}
+
+.favorite-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: #90949c;
+}
+
+.favorite-item-content {
+    font-size: 14px;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.favorite-item-remove {
+    background: none;
+    border: none;
+    color: #ff4444;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+    opacity: 0.6;
+}
+
+.favorite-item-remove:hover {
+    opacity: 1;
+}
+
+/* UI Scaling */
+body {
+    font-size: calc(14px * var(--ui-scale, 1));
+}
+
+.message-bubble {
+    font-size: calc(14px * var(--ui-scale, 1));
+}
+
+.status-bar {
+    font-size: calc(13px * var(--ui-scale, 1));
+}
+
+.tabs button {
+    font-size: calc(14px * var(--ui-scale, 1));
+    padding: calc(10px * var(--ui-scale, 1)) calc(20px * var(--ui-scale, 1));
+}
+
+#messageInput, #richEditor {
+    font-size: calc(14px * var(--ui-scale, 1));
+}
+
+.btn-primary, .btn-secondary {
+    font-size: calc(14px * var(--ui-scale, 1));
+    padding: calc(8px * var(--ui-scale, 1)) calc(16px * var(--ui-scale, 1));
+}
+
+/* Typing indicator always at bottom */
+.typing-indicator {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-color);
+    padding: 10px 0;
+    z-index: 5;
+}
+
+body.dark .typing-indicator {
+    background: #1a1a1a;
+}

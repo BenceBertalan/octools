@@ -51,6 +51,10 @@ let richEditorInstance = null;
 let editRichEditorInstance = null;
 let originalMessageText = '';
 
+// Favorites state
+const favoriteMessages = new Map(); // messageID -> {text, role, timestamp}
+let lastPromptTap = 0; // For double-tap detection
+
 // Post-process marked.js output to fix list spacing issues
 function cleanMarkedOutput(html) {
     if (!html) return html;
@@ -116,6 +120,11 @@ const darkThemeCheckbox = getEl('darkTheme');
 const livenessTimeoutInput = getEl('livenessTimeout');
 const livenessRow = getEl('livenessRow');
 const livenessCountdown = getEl('livenessCountdown');
+const uiScaleInput = getEl('uiScale');
+const uiScaleValue = getEl('uiScaleValue');
+const favoritesModal = getEl('favoritesModal');
+const closeFavorites = getEl('closeFavorites');
+const favoritesList = getEl('favoritesList');
 
 // Rich editor DOM elements
 const inputContainer = getEl('inputContainer');
@@ -618,6 +627,33 @@ if (livenessTimeoutInput) {
     });
 }
 
+if (uiScaleInput) {
+    uiScaleInput.addEventListener('input', (e) => {
+        const scale = parseInt(e.target.value);
+        if (uiScaleValue) uiScaleValue.textContent = scale + '%';
+        document.documentElement.style.setProperty('--ui-scale', scale / 100);
+        setCookie('uiScale', scale.toString());
+    });
+}
+
+if (closeFavorites) {
+    closeFavorites.addEventListener('click', () => {
+        if (favoritesModal) favoritesModal.classList.remove('active');
+    });
+}
+
+// Double-tap on prompt bar to open favorites
+if (messageInput) {
+    messageInput.addEventListener('click', () => {
+        const now = Date.now();
+        if (now - lastPromptTap < 300) {
+            // Double tap detected
+            showFavoritesModal();
+        }
+        lastPromptTap = now;
+    });
+}
+
 if (qsAgentSelect) {
     qsAgentSelect.addEventListener('change', (e) => {
         if (agentSelect) agentSelect.value = e.target.value;
@@ -795,6 +831,25 @@ function applyStoredPreferences() {
     const livenessTimeout = getCookie('livenessTimeout') || '240';
     if (livenessTimeoutInput) {
         livenessTimeoutInput.value = livenessTimeout;
+    }
+    
+    // Load UI scale
+    const uiScale = getCookie('uiScale') || '100';
+    if (uiScaleInput) {
+        uiScaleInput.value = uiScale;
+        if (uiScaleValue) uiScaleValue.textContent = uiScale + '%';
+        document.documentElement.style.setProperty('--ui-scale', parseInt(uiScale) / 100);
+    }
+    
+    // Load favorites from localStorage
+    try {
+        const stored = localStorage.getItem('favoriteMessages');
+        if (stored) {
+            const favorites = JSON.parse(stored);
+            favorites.forEach(fav => favoriteMessages.set(fav.id, fav));
+        }
+    } catch (e) {
+        console.error('Failed to load favorites:', e);
     }
 }
 
@@ -2159,6 +2214,9 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
 }
 
 function updateStreamingMessage(messageID, text, isReasoning = false, metadata = {}) {
+    // Don't show bubble until there's at least one word
+    if (!text || text.trim().split(/\s+/).length === 0) return;
+    
     let streamMsg = document.getElementById('stream-' + messageID);
     if (!streamMsg) {
         streamMsg = document.createElement('div');
@@ -2192,7 +2250,9 @@ function removeStreamingMessage(messageID) {
 }
 
 function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null, reasoningParts = null, todoParts = null) {
-    if (!text && (!reasoningParts || reasoningParts.length === 0) && (!todoParts || todoParts.length === 0)) return;
+    // Check if there's actual content (at least one word in text or has reasoning/todo parts)
+    const hasTextContent = text && text.trim().split(/\s+/).length > 0;
+    if (!hasTextContent && (!reasoningParts || reasoningParts.length === 0) && (!todoParts || todoParts.length === 0)) return;
 
     const msgID = metadata ? (metadata.id || metadata.messageID) : null;
     if (msgID && document.getElementById('msg-' + msgID)) return;
@@ -2200,6 +2260,19 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${role}`;
     if (msgID) bubble.id = 'msg-' + msgID;
+    
+    // Add favorite button
+    if (msgID && text) {
+        const favoriteBtn = document.createElement('button');
+        favoriteBtn.className = 'favorite-btn';
+        favoriteBtn.textContent = favoriteMessages.has(msgID) ? '⭐' : '☆';
+        if (favoriteMessages.has(msgID)) favoriteBtn.classList.add('favorited');
+        favoriteBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleFavorite(msgID, text, role);
+        };
+        bubble.appendChild(favoriteBtn);
+    }
     
     if (metadata && (metadata.agent || metadata.modelID || role === 'user')) {
         const infoBar = document.createElement('div');
@@ -3198,6 +3271,93 @@ async function loadSessionHistory(id) {
             }
         });
     } catch (e) { console.error('History load failed:', e); }
+}
+
+// Favorites Management
+function toggleFavorite(messageID, text, role) {
+    if (favoriteMessages.has(messageID)) {
+        favoriteMessages.delete(messageID);
+    } else {
+        favoriteMessages.set(messageID, {
+            id: messageID,
+            text: text,
+            role: role,
+            timestamp: Date.now()
+        });
+    }
+    
+    // Save to localStorage
+    try {
+        localStorage.setItem('favoriteMessages', JSON.stringify(Array.from(favoriteMessages.values())));
+    } catch (e) {
+        console.error('Failed to save favorites:', e);
+    }
+    
+    // Update UI
+    updateFavoriteButton(messageID);
+}
+
+function updateFavoriteButton(messageID) {
+    const btn = document.querySelector(`#msg-${messageID} .favorite-btn`);
+    if (btn) {
+        btn.textContent = favoriteMessages.has(messageID) ? '⭐' : '☆';
+        btn.classList.toggle('favorited', favoriteMessages.has(messageID));
+    }
+}
+
+function showFavoritesModal() {
+    if (!favoritesModal || !favoritesList) return;
+    
+    favoritesList.innerHTML = '';
+    
+    if (favoriteMessages.size === 0) {
+        favoritesList.innerHTML = '<div class="favorites-empty">No favorite messages yet. Star messages to save them here!</div>';
+    } else {
+        const favorites = Array.from(favoriteMessages.values()).sort((a, b) => b.timestamp - a.timestamp);
+        favorites.forEach(fav => {
+            const item = document.createElement('div');
+            item.className = 'favorite-item';
+            
+            const header = document.createElement('div');
+            header.className = 'favorite-item-header';
+            header.innerHTML = `
+                <span>${fav.role === 'user' ? '👤 User' : '🤖 Assistant'}</span>
+                <button class="favorite-item-remove" onclick="event.stopPropagation(); removeFavorite('${fav.id}')">✕</button>
+            `;
+            
+            const content = document.createElement('div');
+            content.className = 'favorite-item-content';
+            content.textContent = fav.text;
+            
+            item.appendChild(header);
+            item.appendChild(content);
+            
+            item.addEventListener('click', () => {
+                sendFavoriteMessage(fav.text);
+            });
+            
+            favoritesList.appendChild(item);
+        });
+    }
+    
+    favoritesModal.classList.add('active');
+}
+
+function removeFavorite(messageID) {
+    favoriteMessages.delete(messageID);
+    try {
+        localStorage.setItem('favoriteMessages', JSON.stringify(Array.from(favoriteMessages.values())));
+    } catch (e) {
+        console.error('Failed to save favorites:', e);
+    }
+    updateFavoriteButton(messageID);
+    showFavoritesModal(); // Refresh the modal
+}
+
+async function sendFavoriteMessage(text) {
+    if (favoritesModal) favoritesModal.classList.remove('active');
+    if (messageInput) messageInput.value = text;
+    await sendMessage();
 }
 
 async function fetchLogs() {

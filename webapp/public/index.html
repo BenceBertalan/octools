@@ -227,6 +227,18 @@
                             Time before automatic message retry (10-600 seconds, default: 240s / 4 minutes)
                         </small>
                     </div>
+                    <div class="form-group">
+                        <label for="uiScale">UI Scale (%)</label>
+                        <input type="range" id="uiScale" min="80" max="200" value="100" step="10" autocomplete="off">
+                        <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                            <small style="color: #90949c; font-size: 12px;">80%</small>
+                            <small style="color: #90949c; font-size: 12px;" id="uiScaleValue">100%</small>
+                            <small style="color: #90949c; font-size: 12px;">200%</small>
+                        </div>
+                        <small style="color: #90949c; font-size: 12px; margin-top: 4px; display: block;">
+                            Adjust interface size for better visibility (useful for car displays)
+                        </small>
+                    </div>
                 </div>
 
                 <div id="logsTab" class="settings-tab-content">
@@ -313,6 +325,21 @@
                 <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
                     <button class="btn-secondary" id="cancelEditMessage">Cancel</button>
                     <button class="btn-primary" id="resendMessageBtn">Resend Message</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Favorites Modal -->
+    <div class="modal" id="favoritesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⭐ Favorite Messages</h3>
+                <button class="close-btn" id="closeFavorites">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="favoritesList" class="favorites-list">
+                    <div class="favorites-empty">No favorite messages yet. Star messages to save them here!</div>
                 </div>
             </div>
         </div>
