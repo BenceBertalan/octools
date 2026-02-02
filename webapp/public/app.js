@@ -1122,8 +1122,8 @@ function handleSubagentProgress(data) {
 }
 
 function createProgressBubble(messageID, partID) {
-    const sidebar = document.getElementById('progressSidebarContent');
-    if (!sidebar) return null;
+    const container = document.getElementById('messagesContainer');
+    if (!container) return null;
     
     const bubble = document.createElement('div');
     bubble.id = `progress-${messageID}-${partID}`;
@@ -1131,7 +1131,8 @@ function createProgressBubble(messageID, partID) {
     bubble.dataset.messageId = messageID;
     bubble.dataset.partId = partID;
     bubble.dataset.startTime = Date.now();
-    sidebar.appendChild(bubble);
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
     return bubble;
 }
 
