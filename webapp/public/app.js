@@ -2098,7 +2098,7 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
             const agentName = metadata.agent || 'Assistant';
             const modelName = metadata.modelID ? `${metadata.providerID ? metadata.providerID + '/' : ''}${metadata.modelID}` : '';
             infoBar.innerHTML = `<span class="agent-tag">🤖 ${agentName}</span>${modelName ? `<span class="model-tag">${modelName}</span>` : ''}`;
-            bubble.appendChild(infoBar);
+            streamMsg.appendChild(infoBar);
         }
 
         const content = document.createElement('div');
