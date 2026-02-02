@@ -1216,6 +1216,12 @@ function updateStatus(status, text) {
 
 function addEvent(type, data) {
     if (!eventsContainer) return;
+    
+    // Filter out events with delta property (incremental text updates)
+    if (typeof data === 'object' && data !== null && 'delta' in data) {
+        return;
+    }
+    
     const item = document.createElement('div');
     item.className = 'event-item';
     item.innerHTML = `<div class="event-header">${type}</div><div class="event-body">${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</div><div class="event-time">${new Date().toLocaleTimeString()}</div>`;
