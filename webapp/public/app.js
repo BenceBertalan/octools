@@ -1016,39 +1016,6 @@ function handleRetryFailed(data) {
     // Add error message
     addMessage('system', `❌ Session retry failed: ${error}`, true, true, false, true);
 }
-}
-
-function handleRetrySuccess(data) {
-    const { sessionID } = data;
-    
-    // Hide retry notification
-    hideRetryNotification();
-    
-    // Hide liveness timer
-    const livenessContainer = document.getElementById('livenessContainer');
-    if (livenessContainer) {
-        livenessContainer.style.display = 'none';
-    }
-    
-    // Add success message
-    addMessage('system', '✅ Session retry successful!', false, false, false, true);
-}
-
-function handleRetryFailed(data) {
-    const { sessionID, error } = data;
-    
-    // Hide retry notification
-    hideRetryNotification();
-    
-    // Hide liveness timer
-    const livenessContainer = document.getElementById('livenessContainer');
-    if (livenessContainer) {
-        livenessContainer.style.display = 'none';
-    }
-    
-    // Show error
-    addMessage('system', `❌ Session retry failed: ${error}`, false, true, false, true);
-}
 
 function showRetryNotification(message) {
     // Remove existing notification if any
