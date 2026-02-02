@@ -872,8 +872,6 @@ function handleSessionLiveness(data) {
             }
             targetElement.appendChild(timerBadge);
         }
-            messageHeader.appendChild(timerBadge);
-        }
         
         // Update timer text and color based on time
         timerBadge.textContent = `⏱ ${secondsSinceLastEvent}s`;
