@@ -7,60 +7,6 @@ let agents = [];
 let models = [];
 let messageBuffer = new Map();
 
-// Custom markdown formatter - only renders code blocks and headings
-function formatSelectiveMarkdown(text) {
-    if (!text) return text;
-    
-    let html = text;
-    
-    // Escape HTML to prevent injection
-    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
-    // Format code blocks (```language\ncode\n```) - MUST come before inline code
-    html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, function(match, lang, code) {
-        return '<pre><code class="language-' + (lang || 'text') + '">' + code.trim() + '</code></pre>';
-    });
-    
-    // Format inline code (`code`) - MUST come before bold/italic to avoid conflicts
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-    
-    // Format bold + italic (***text*** or ___text___)
-    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-    html = html.replace(/___(.+?)___/g, '<strong><em>$1</em></strong>');
-    
-    // Format bold (**text** or __text__)
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
-    
-    // Format italic (*text* or _text_) - be careful not to match list markers
-    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    html = html.replace(/_(.+?)_/g, '<em>$1</em>');
-    
-    // Format headings (# Heading)
-    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-    
-    // Format unordered lists (-, *, +)
-    // Match lines starting with -, *, or + followed by space
-    html = html.replace(/^([*\-+]) (.+)$/gm, '<li>$2</li>');
-    
-    // Format ordered lists (1., 2., etc.)
-    html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
-    
-    // Wrap consecutive <li> tags in <ul> or <ol>
-    // This handles unordered lists
-    html = html.replace(/(<li>.*?<\/li>\n?)+/g, function(match) {
-        // Remove newlines inside the list to prevent <br> tags between items
-        return '<ul>' + match.replace(/\n/g, '') + '</ul>';
-    });
-    
-    // Convert newlines to <br> for display
-    html = html.replace(/\n/g, '<br>');
-    
-    return html;
-}
-
 // Pagination state
 let messagesCache = new Map(); // sessionID -> all messages
 let oldestDisplayedIndex = new Map(); // sessionID -> index
@@ -222,7 +168,7 @@ function switchToRichMode() {
     
     if (richEditor) {
         // Show selectively formatted markdown (code blocks & headings only)
-        richEditor.innerHTML = formatSelectiveMarkdown(simpleText || '');
+        richEditor.innerHTML = typeof marked !== 'undefined' ? marked.parse(simpleText || '') : (simpleText || '');
         richEditor.focus();
     }
 }
@@ -461,7 +407,7 @@ function showEditMessageModal(messageText) {
     
     if (editRichEditor) {
         // Show selectively formatted markdown (code blocks & headings only)
-        editRichEditor.innerHTML = formatSelectiveMarkdown(messageText);
+        editRichEditor.innerHTML = typeof marked !== 'undefined' ? marked.parse(messageText) : messageText;
     }
     
     if (editMessageModal) {
@@ -898,7 +844,7 @@ function createReasoningSection(reasoningParts, messageID) {
     content.className = 'reasoning-content' + (isExpanded ? ' expanded' : '');
     
     // Show selectively formatted markdown (code blocks & headings only)
-    content.innerHTML = formatSelectiveMarkdown(reasoningText);
+    content.innerHTML = typeof marked !== 'undefined' ? marked.parse(reasoningText) : reasoningText;
     
     toggle.onclick = (e) => {
         e.stopPropagation();
@@ -1052,7 +998,7 @@ async function loadMoreMessages() {
             const content = document.createElement('div');
             content.className = 'message-content';
             // Show selectively formatted markdown (code blocks & headings only)
-            content.innerHTML = formatSelectiveMarkdown(text);
+            content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
             bubble.appendChild(content);
             
             if (msg.info.error) bubble.classList.add('error');
@@ -1499,10 +1445,8 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
         if (messagesContainer) messagesContainer.appendChild(streamMsg);
     }
     
-    
     const content = streamMsg.querySelector('.message-content') || streamMsg;
-    // Show selectively formatted markdown (code blocks & headings only)
-    content.innerHTML = formatSelectiveMarkdown(text);
+    content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
     if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -1533,7 +1477,7 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     const content = document.createElement('div');
     content.className = 'message-content';
     // Show selectively formatted markdown (code blocks & headings only)
-    content.innerHTML = formatSelectiveMarkdown(text);
+    content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
     bubble.appendChild(content);
 
     // Add edit button for user messages
