@@ -600,6 +600,103 @@ body.dark .form-group select, body.dark .qs-item select {
 .event-body { font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
 .event-time { font-size: 11px; color: #90949c; margin-top: 8px; text-align: right; }
 
+/* Reasoning Sections */
+.reasoning-section {
+    margin-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding-top: 8px;
+}
+
+body.dark .reasoning-section {
+    border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.reasoning-toggle {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-color);
+    opacity: 0.7;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    transition: opacity 0.2s;
+    background: none;
+    border: none;
+    font-family: inherit;
+    user-select: none;
+}
+
+.reasoning-toggle:hover {
+    opacity: 1;
+}
+
+.reasoning-toggle-icon {
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+
+.reasoning-toggle.expanded .reasoning-toggle-icon {
+    transform: rotate(180deg);
+}
+
+.reasoning-content {
+    font-style: italic;
+    opacity: 0.8;
+    padding: 8px 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.reasoning-content.expanded {
+    max-height: 2000px;
+    opacity: 0.8;
+}
+
+/* Load More Button */
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    padding: 12px 16px;
+}
+
+.load-more-btn {
+    background: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.load-more-btn:hover:not(:disabled) {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.load-more-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+body.dark .load-more-btn {
+    background-color: #3a3b3c;
+    color: #e4e6eb;
+}
+
+body.dark .load-more-btn:hover:not(:disabled) {
+    background: var(--primary-color);
+    color: white;
+}
+
 /* Dark Mode Overrides */
 body.dark {
     --bg-color: #1c1e21;

@@ -6,6 +6,14 @@ let agents = [];
 let models = [];
 let messageBuffer = new Map();
 
+// Pagination state
+let messagesCache = new Map(); // sessionID -> all messages
+let oldestDisplayedIndex = new Map(); // sessionID -> index
+let loadingMore = false;
+
+// Reasoning state
+let reasoningExpanded = new Map(); // messageID -> boolean
+
 // Helper to get element by ID with error checking
 const getEl = (id) => {
     const el = document.getElementById(id);
@@ -200,6 +208,47 @@ async function safeJson(response) {
     }
 }
 
+// Reasoning section helper
+function createReasoningSection(reasoningParts, messageID) {
+    if (!reasoningParts || reasoningParts.length === 0) return null;
+    
+    const reasoningText = reasoningParts.map(p => p.text).filter(Boolean).join('\n\n');
+    if (!reasoningText) return null;
+    
+    const section = document.createElement('div');
+    section.className = 'reasoning-section';
+    
+    // Get default state from cookie or hideReasoning checkbox
+    const hideByDefault = getCookie('hideReasoning') === 'true';
+    const isExpanded = reasoningExpanded.get(messageID) ?? !hideByDefault;
+    
+    const toggle = document.createElement('button');
+    toggle.className = 'reasoning-toggle' + (isExpanded ? ' expanded' : '');
+    toggle.innerHTML = `<span class="reasoning-toggle-icon">▼</span> <span>${isExpanded ? 'Hide' : 'Show'} reasoning</span>`;
+    
+    const content = document.createElement('div');
+    content.className = 'reasoning-content' + (isExpanded ? ' expanded' : '');
+    
+    try {
+        content.innerHTML = typeof marked !== 'undefined' ? marked.parse(reasoningText) : reasoningText;
+    } catch (e) {
+        content.textContent = reasoningText;
+    }
+    
+    toggle.onclick = (e) => {
+        e.stopPropagation();
+        const nowExpanded = !content.classList.contains('expanded');
+        content.classList.toggle('expanded');
+        toggle.classList.toggle('expanded');
+        toggle.querySelector('span:last-child').textContent = nowExpanded ? 'Hide reasoning' : 'Show reasoning';
+        reasoningExpanded.set(messageID, nowExpanded);
+    };
+    
+    section.appendChild(toggle);
+    section.appendChild(content);
+    return section;
+}
+
 async function sendMessage() {
     if (!currentSession) {
         alert('Please connect to a session first');
@@ -283,8 +332,8 @@ function removeStreamingMessage(messageID) {
     if (streamMsg) streamMsg.remove();
 }
 
-function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null) {
-    if (!text) return;
+function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null, reasoningParts = null) {
+    if (!text && (!reasoningParts || reasoningParts.length === 0)) return;
 
     const msgID = metadata ? (metadata.id || metadata.messageID) : null;
     if (msgID && document.getElementById('msg-' + msgID)) return;
@@ -449,6 +498,14 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     if (isWarning) bubble.classList.add('warning');
     if (isInfo) bubble.classList.add('info-blue');
     
+    // Add reasoning section if present
+    if (reasoningParts && reasoningParts.length > 0 && msgID) {
+        const reasoningSection = createReasoningSection(reasoningParts, msgID);
+        if (reasoningSection) {
+            bubble.appendChild(reasoningSection);
+        }
+    }
+    
     if (messagesContainer) {
         messagesContainer.appendChild(bubble);
         const time = document.createElement('div');
@@ -597,8 +654,13 @@ async function syncSessionState(sessionID) {
         let added = 0;
         messages.forEach(msg => {
             if (!document.getElementById('msg-' + msg.info.id)) {
-                const text = msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n');
-                if (text) { addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info); added++; }
+                const textParts = msg.parts.filter(p => p.type === 'text');
+                const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
+                const text = textParts.map(p => p.text).join('\n');
+                if (text || reasoningParts.length > 0) { 
+                    addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts); 
+                    added++; 
+                }
             }
         });
         if (added > 0) addMessage('assistant', `✨ Synchronized ${added} messages.`, false, false, false, true);
@@ -726,8 +788,12 @@ async function connectToSession(session) {
         if (settingsModal) settingsModal.classList.remove('active');
         if (messagesContainer) messagesContainer.innerHTML = '';
         messages.forEach(msg => {
-            const text = msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n');
-            if (text) addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info);
+            const textParts = msg.parts.filter(p => p.type === 'text');
+            const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
+            const text = textParts.map(p => p.text).join('\n');
+            if (text || reasoningParts.length > 0) {
+                addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts);
+            }
         });
     } catch (e) { addEvent('Error', 'Connect failed: ' + e.message); }
 }
@@ -738,8 +804,12 @@ async function loadSessionHistory(id) {
         if (!response.ok) throw new Error('Failed to fetch history');
         const msgs = await safeJson(response) || [];
         msgs.forEach(msg => {
-            const text = msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n');
-            if (text) addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info);
+            const textParts = msg.parts.filter(p => p.type === 'text');
+            const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
+            const text = textParts.map(p => p.text).join('\n');
+            if (text || reasoningParts.length > 0) {
+                addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts);
+            }
         });
     } catch (e) { console.error('History load failed:', e); }
 }
