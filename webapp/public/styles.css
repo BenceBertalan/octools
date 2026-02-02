@@ -164,7 +164,7 @@ body {
     max-width: 75%;
     padding: 10px 14px;
     border-radius: 18px;
-    font-size: 15px;
+    font-size: 14.25px; /* 5% smaller than 15px */
     line-height: 1.4;
     position: relative;
     margin-bottom: 4px;
@@ -337,6 +337,27 @@ body.dark .option-item-inline {
 .message-bubble a {
     word-break: break-all;
     overflow-wrap: anywhere;
+}
+
+/* Fix for lists inside message bubbles */
+.message-bubble ul,
+.message-bubble ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.message-bubble li {
+    margin: 4px 0;
+}
+
+.message-content ul,
+.message-content ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.message-content li {
+    margin: 4px 0;
 }
 
 /* Typing Indicator */
