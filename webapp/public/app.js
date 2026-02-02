@@ -304,6 +304,20 @@ async function loadMoreMessages() {
         const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
         const text = textParts.map(p => p.text).join('\n');
         
+        // Log all messages to Events tab
+        addEvent('Load Message', {
+            source: 'loadMoreMessages',
+            messageID: msg.info.id,
+            role: msg.info.role,
+            totalParts: msg.parts.length,
+            textParts: textParts.length,
+            reasoningParts: reasoningParts.length,
+            hasText: !!text,
+            partTypes: msg.parts.map(p => p.type),
+            modelID: msg.info.modelID,
+            agent: msg.info.agent
+        });
+        
         if (text || reasoningParts.length > 0) {
             // Create message bubble
             const msgID = msg.info.id;
@@ -803,6 +817,21 @@ async function syncSessionState(sessionID) {
         const messages = await safeJson(response) || [];
         let added = 0;
         messages.forEach(msg => {
+            // Log all messages to Events tab
+            addEvent('Load Message', {
+                source: 'syncSessionState',
+                messageID: msg.info.id,
+                role: msg.info.role,
+                totalParts: msg.parts.length,
+                textParts: msg.parts.filter(p => p.type === 'text').length,
+                reasoningParts: msg.parts.filter(p => p.type === 'reasoning').length,
+                hasText: !!msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n'),
+                partTypes: msg.parts.map(p => p.type),
+                modelID: msg.info.modelID,
+                agent: msg.info.agent,
+                alreadyDisplayed: !!document.getElementById('msg-' + msg.info.id)
+            });
+            
             if (!document.getElementById('msg-' + msg.info.id)) {
                 const textParts = msg.parts.filter(p => p.type === 'text');
                 const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
@@ -959,6 +988,21 @@ async function connectToSession(session) {
             const textParts = msg.parts.filter(p => p.type === 'text');
             const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
             const text = textParts.map(p => p.text).join('\n');
+            
+            // Log all messages to Events tab
+            addEvent('Load Message', {
+                source: 'connectToSession',
+                messageID: msg.info.id,
+                role: msg.info.role,
+                totalParts: msg.parts.length,
+                textParts: textParts.length,
+                reasoningParts: reasoningParts.length,
+                hasText: !!text,
+                partTypes: msg.parts.map(p => p.type),
+                modelID: msg.info.modelID,
+                agent: msg.info.agent
+            });
+            
             if (text || reasoningParts.length > 0) {
                 addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts);
             }
@@ -975,6 +1019,21 @@ async function loadSessionHistory(id) {
             const textParts = msg.parts.filter(p => p.type === 'text');
             const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
             const text = textParts.map(p => p.text).join('\n');
+            
+            // Log all messages to Events tab
+            addEvent('Load Message', {
+                source: 'loadSessionHistory',
+                messageID: msg.info.id,
+                role: msg.info.role,
+                totalParts: msg.parts.length,
+                textParts: textParts.length,
+                reasoningParts: reasoningParts.length,
+                hasText: !!text,
+                partTypes: msg.parts.map(p => p.type),
+                modelID: msg.info.modelID,
+                agent: msg.info.agent
+            });
+            
             if (text || reasoningParts.length > 0) {
                 addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts);
             }
