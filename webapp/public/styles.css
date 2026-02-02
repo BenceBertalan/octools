@@ -419,9 +419,10 @@ body.dark .message-content h1 {
     line-height: 1.4;
 }
 
-/* Remove any extra spacing from <br> tags inside lists */
-.message-content ul br:last-child,
-.message-content ol br:last-child {
+/* CRITICAL: Remove ALL <br> tags inside lists to prevent spacing issues */
+.message-content ul br,
+.message-content ol br,
+.message-content li br {
     display: none;
 }
 
@@ -443,27 +444,6 @@ body.dark .message-content h1 {
 .message-bubble a {
     word-break: break-all;
     overflow-wrap: anywhere;
-}
-
-/* Fix for lists inside message bubbles */
-.message-bubble ul,
-.message-bubble ol {
-    margin: 2px 0; /* Minimal spacing */
-    padding-left: 24px;
-}
-
-.message-bubble li {
-    margin: 0; /* No margin between list items */
-}
-
-.message-content ul,
-.message-content ol {
-    margin: 2px 0; /* Minimal spacing */
-    padding-left: 24px;
-}
-
-.message-content li {
-    margin: 0; /* No margin between list items */
 }
 
 /* Reduce paragraph spacing */

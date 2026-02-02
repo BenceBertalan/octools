@@ -51,7 +51,8 @@ function formatSelectiveMarkdown(text) {
     // Wrap consecutive <li> tags in <ul> or <ol>
     // This handles unordered lists
     html = html.replace(/(<li>.*?<\/li>\n?)+/g, function(match) {
-        return '<ul>' + match + '</ul>';
+        // Remove newlines inside the list to prevent <br> tags between items
+        return '<ul>' + match.replace(/\n/g, '') + '</ul>';
     });
     
     // Convert newlines to <br> for display
