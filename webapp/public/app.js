@@ -654,47 +654,6 @@ async function loadModelPriority() {
     }
 }
 
-        // Render priority list
-        renderPriorityList(priority.models);
-
-        // Populate add model dropdown (exclude already added)
-        const addModelSelect = document.getElementById('addModelSelect');
-        if (addModelSelect) {
-            const availableModels = models.filter(m =>
-                !priority.models.includes(`${m.providerID}/${m.modelID}`)
-            );
-
-            // Clear and add default option
-            addModelSelect.innerHTML = '<option value="">Select a model...</option>';
-            
-            // Group models by provider
-            const groups = {};
-            availableModels.forEach(m => {
-                if (!groups[m.providerID]) groups[m.providerID] = [];
-                groups[m.providerID].push(m);
-            });
-            
-            // Create optgroups
-            Object.entries(groups).forEach(([providerID, providerModels]) => {
-                const group = document.createElement('optgroup');
-                group.label = providerID;
-                
-                providerModels.forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = `${m.providerID}/${m.modelID}`;
-                    opt.textContent = m.name || m.modelID;
-                    group.appendChild(opt);
-                });
-                
-                addModelSelect.appendChild(group);
-            });
-        }
-    } catch (error) {
-        console.error('Failed to load model priority:', error);
-        showToast('Failed to load model priority', 'error');
-    }
-}
-
 function renderPriorityList(models) {
     const priorityList = document.getElementById('priorityList');
     if (!priorityList) return;
