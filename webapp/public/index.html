@@ -275,29 +275,61 @@
         </div>
     </div>
 
-    <!-- Menu Modal -->
-    <div class="modal" id="menuModal">
-        <div class="modal-content menu-modal-content">
-            <div class="modal-header">
-                <h3>Menu</h3>
-                <button class="close-btn" id="closeMenu">&times;</button>
+    <!-- Menu Drawer -->
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+    <div class="drawer" id="menuDrawer">
+        <div class="drawer-header">
+            <h3>Menu</h3>
+            <button class="close-btn" id="closeMenu">&times;</button>
+        </div>
+        <div class="drawer-body">
+            <div class="menu-items">
+                <button class="menu-item" id="menuSessionSettings">
+                    <span class="menu-icon">⚙️</span>
+                    <span class="menu-label">Session Settings</span>
+                </button>
+                <button class="menu-item" id="menuAgentSettings">
+                    <span class="menu-icon">🤖</span>
+                    <span class="menu-label">Agent & Model Settings</span>
+                </button>
+                <button class="menu-item" id="menuModelPriority">
+                    <span class="menu-icon">⭐</span>
+                    <span class="menu-label">Model Priority</span>
+                </button>
             </div>
-            <div class="modal-body">
-                <div class="menu-items">
-                    <button class="menu-item" id="menuSessionSettings">
-                        <span class="menu-icon">⚙️</span>
-                        <span class="menu-label">Session Settings</span>
-                    </button>
-                    <button class="menu-item" id="menuAgentSettings">
-                        <span class="menu-icon">🤖</span>
-                        <span class="menu-label">Agent & Model Settings</span>
-                    </button>
-                    <button class="menu-item" id="menuModelPriority">
-                        <span class="menu-icon">⭐</span>
-                        <span class="menu-label">Model Priority</span>
-                    </button>
-                </div>
-            </div>
+        </div>
+    </div>
+
+    <!-- Page: Session Settings -->
+    <div class="page" id="pageSessionSettings">
+        <div class="page-header">
+            <button class="back-btn" id="backFromSessionSettings">← Back</button>
+            <h2>Session Settings</h2>
+        </div>
+        <div class="page-content" id="sessionSettingsContent">
+            <!-- Session settings will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Page: Agent & Model Settings -->
+    <div class="page" id="pageAgentSettings">
+        <div class="page-header">
+            <button class="back-btn" id="backFromAgentSettings">← Back</button>
+            <h2>Agent & Model Settings</h2>
+        </div>
+        <div class="page-content" id="agentSettingsContent">
+            <!-- Agent settings will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Page: Model Priority -->
+    <div class="page" id="pageModelPriority">
+        <div class="page-header">
+            <button class="back-btn" id="backFromModelPriority">← Back</button>
+            <h2>Model Priority</h2>
+        </div>
+        <div class="page-content" id="modelPriorityContent">
+            <!-- Model priority will be loaded here -->
         </div>
     </div>
 

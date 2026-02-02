@@ -260,39 +260,247 @@ if (sessionSearch) {
 if (hamburgerBtn) {
     hamburgerBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const menuModal = document.getElementById('menuModal');
-        if (menuModal) {
-            menuModal.classList.add('active');
+        const menuDrawer = document.getElementById('menuDrawer');
+        const drawerOverlay = document.getElementById('drawerOverlay');
+        if (menuDrawer && drawerOverlay) {
+            menuDrawer.classList.add('active');
+            drawerOverlay.classList.add('active');
         }
     });
 }
 
-// Close menu modal
+// Close menu drawer
 const closeMenu = document.getElementById('closeMenu');
+const drawerOverlay = document.getElementById('drawerOverlay');
+
 if (closeMenu) {
     closeMenu.addEventListener('click', () => {
-        document.getElementById('menuModal').classList.remove('active');
+        const menuDrawer = document.getElementById('menuDrawer');
+        if (menuDrawer && drawerOverlay) {
+            menuDrawer.classList.remove('active');
+            drawerOverlay.classList.remove('active');
+        }
     });
+}
+
+if (drawerOverlay) {
+    drawerOverlay.addEventListener('click', () => {
+        const menuDrawer = document.getElementById('menuDrawer');
+        if (menuDrawer) {
+            menuDrawer.classList.remove('active');
+            drawerOverlay.classList.remove('active');
+        }
+    });
+}
+
+// Helper function to open a page
+function openPage(pageId) {
+    const page = document.getElementById(pageId);
+    const menuDrawer = document.getElementById('menuDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    
+    if (page) {
+        page.classList.add('active');
+        // Close drawer when opening page
+        if (menuDrawer && drawerOverlay) {
+            menuDrawer.classList.remove('active');
+            drawerOverlay.classList.remove('active');
+        }
+    }
+}
+
+// Helper function to close a page
+function closePage(pageId) {
+    const page = document.getElementById(pageId);
+    if (page) {
+        page.classList.remove('active');
+    }
 }
 
 // Menu item handlers
 const menuSessionSettings = document.getElementById('menuSessionSettings');
 const menuAgentSettings = document.getElementById('menuAgentSettings');
+const menuModelPriority = document.getElementById('menuModelPriority');
 
 if (menuSessionSettings) {
     menuSessionSettings.addEventListener('click', () => {
-        document.getElementById('menuModal').classList.remove('active');
-        settingsModal.classList.add('active');
-        loadExistingSessions();
+        openPage('pageSessionSettings');
+        loadSessionSettingsPage();
     });
 }
 
 if (menuAgentSettings) {
     menuAgentSettings.addEventListener('click', () => {
-        document.getElementById('menuModal').classList.remove('active');
-        // Will open agent settings modal (to be implemented)
-        console.log('Agent settings clicked - modal coming soon');
+        openPage('pageAgentSettings');
+        loadAgentSettingsPage();
     });
+}
+
+if (menuModelPriority) {
+    menuModelPriority.addEventListener('click', () => {
+        openPage('pageModelPriority');
+        loadModelPriorityPage();
+    });
+}
+
+// Back button handlers
+const backFromSessionSettings = document.getElementById('backFromSessionSettings');
+const backFromAgentSettings = document.getElementById('backFromAgentSettings');
+const backFromModelPriority = document.getElementById('backFromModelPriority');
+
+if (backFromSessionSettings) {
+    backFromSessionSettings.addEventListener('click', () => {
+        closePage('pageSessionSettings');
+    });
+}
+
+if (backFromAgentSettings) {
+    backFromAgentSettings.addEventListener('click', () => {
+        closePage('pageAgentSettings');
+    });
+}
+
+if (backFromModelPriority) {
+    backFromModelPriority.addEventListener('click', () => {
+        closePage('pageModelPriority');
+    });
+}
+
+// Page loader functions
+function loadSessionSettingsPage() {
+    const content = document.getElementById('sessionSettingsContent');
+    if (!content) return;
+    
+    // Move existing session settings content to page
+    content.innerHTML = `
+        <div class="settings-section">
+            <h3>Current Session</h3>
+            <p id="currentSessionName">No session selected</p>
+            <button class="btn-primary" id="openSettingsModal">Manage Sessions</button>
+        </div>
+    `;
+    
+    // Wire up the button
+    const openSettingsBtn = document.getElementById('openSettingsModal');
+    if (openSettingsBtn) {
+        openSettingsBtn.addEventListener('click', () => {
+            closePage('pageSessionSettings');
+            settingsModal.classList.add('active');
+            loadExistingSessions();
+        });
+    }
+    
+    // Update current session name
+    const currentSessionNameEl = document.getElementById('currentSessionName');
+    if (currentSessionNameEl && currentSession) {
+        currentSessionNameEl.textContent = currentSession.title || currentSession.slug || currentSession.id;
+    }
+}
+
+function loadAgentSettingsPage() {
+    const content = document.getElementById('agentSettingsContent');
+    if (!content) return;
+    
+    content.innerHTML = `
+        <div class="settings-section">
+            <h3>Agent & Model Configuration</h3>
+            <p>Configure agent and model settings for your sessions.</p>
+            <div class="form-group">
+                <label>Agent Selection</label>
+                <select id="pageAgentSelect" class="form-control">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Model Selection</label>
+                <select id="pageModelSelect" class="form-control">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+            <button class="btn-primary" id="saveAgentSettings">Save Settings</button>
+        </div>
+    `;
+    
+    // Load agents and models
+    loadAgentsForPage();
+    loadModelsForPage();
+}
+
+function loadModelPriorityPage() {
+    const content = document.getElementById('modelPriorityContent');
+    if (!content) return;
+    
+    content.innerHTML = `
+        <div class="settings-section">
+            <h3>Model Priority Configuration</h3>
+            <p>Set priority order for model selection.</p>
+            <div id="modelPriorityList">
+                <p>Loading model priority settings...</p>
+            </div>
+        </div>
+    `;
+    
+    // Load model priority (reuse existing function)
+    loadModelPriorityInPage();
+}
+
+// Helper functions for loading data into pages
+async function loadAgentsForPage() {
+    const select = document.getElementById('pageAgentSelect');
+    if (!select) return;
+    
+    try {
+        const agents = await fetch('/api/agents').then(r => r.json());
+        select.innerHTML = '<option value="">Select an agent...</option>';
+        agents.forEach(agent => {
+            const option = document.createElement('option');
+            option.value = agent.name;
+            option.textContent = agent.name;
+            select.appendChild(option);
+        });
+    } catch (e) {
+        select.innerHTML = '<option value="">Failed to load agents</option>';
+    }
+}
+
+async function loadModelsForPage() {
+    const select = document.getElementById('pageModelSelect');
+    if (!select) return;
+    
+    try {
+        const models = await fetch('/api/models').then(r => r.json());
+        select.innerHTML = '<option value="">Select a model...</option>';
+        
+        // Group by provider
+        const grouped = {};
+        models.forEach(model => {
+            const provider = model.provider || 'Other';
+            if (!grouped[provider]) grouped[provider] = [];
+            grouped[provider].push(model);
+        });
+        
+        Object.keys(grouped).sort().forEach(provider => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = provider;
+            grouped[provider].forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.id;
+                option.textContent = model.name || model.id;
+                optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
+        });
+    } catch (e) {
+        select.innerHTML = '<option value="">Failed to load models</option>';
+    }
+}
+
+function loadModelPriorityInPage() {
+    const container = document.getElementById('modelPriorityList');
+    if (!container) return;
+    
+    // This will be implemented similar to existing model priority modal
+    container.innerHTML = '<p>Model priority configuration coming soon...</p>';
 }
 
 // Close hamburger menu when clicking outside (legacy - can be removed later)
@@ -354,7 +562,6 @@ let currentAgentDefaults = {};
 
 const modelPriorityModal = document.getElementById('modelPriorityModal');
 const closeModelPriority = document.getElementById('closeModelPriority');
-const menuModelPriority = document.getElementById('menuModelPriority');
 
 // ==========================
 // Cost Warning Modal Elements
@@ -388,15 +595,6 @@ if (agentTemperature) {
 if (agentTopP) {
     agentTopP.addEventListener('input', (e) => {
         agentTopPValue.textContent = e.target.value;
-    });
-}
-
-// Load agent settings when modal opens (triggered by menu)
-if (menuAgentSettings) {
-    menuAgentSettings.addEventListener('click', async () => {
-        document.getElementById('menuModal').classList.remove('active');
-        agentSettingsModal.classList.add('active');
-        await loadAgentSettings();
     });
 }
 
@@ -524,13 +722,6 @@ if (modelPriorityModal && closeModelPriority && menuModelPriority) {
         if (e.target === modelPriorityModal) {
             modelPriorityModal.classList.remove('active');
         }
-    });
-
-    // Open from menu
-    menuModelPriority.addEventListener('click', async () => {
-        if (menuModal) menuModal.classList.remove('active');
-        modelPriorityModal.classList.add('active');
-        await loadModelPriority();
     });
 
     // Save button
