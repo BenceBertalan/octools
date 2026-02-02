@@ -158,6 +158,39 @@ app.post('/api/session/:sessionID/message', async (req, res) => {
   }
 });
 
+app.get('/api/session/:sessionID/diff/:file', async (req, res) => {
+  try {
+    const { sessionID, file } = req.params;
+    const filename = decodeURIComponent(file);
+    
+    // Call OpenCode API to get all diffs
+    const response = await fetch(`${OPENCODE_URL}/session/${sessionID}/diff`);
+    if (!response.ok) throw new Error('Failed to fetch diff');
+    
+    const allDiffs = await response.json();
+    const fileDiff = allDiffs.find(d => d.file === filename);
+    
+    if (!fileDiff) {
+      return res.status(404).json({ error: 'File diff not found' });
+    }
+    
+    // Return formatted diff info (full git integration would require git commands)
+    const diffOutput = `@@ File: ${fileDiff.file} @@
+Additions: +${fileDiff.additions}
+Deletions: -${fileDiff.deletions}
+Before: ${fileDiff.before || '(new file)'}
+After: ${fileDiff.after}
+
+Note: Full diff content requires git integration.
+To see changes, use: git diff ${fileDiff.before || 'HEAD'} ${fileDiff.after} -- ${fileDiff.file}`;
+    
+    res.type('text/plain').send(diffOutput);
+    
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/session/:sessionID/abort', async (req, res) => {
   try {
     await octoolsClient.abortSession(req.params.sessionID);
@@ -257,6 +290,11 @@ wss.on('connection', (ws) => {
     'session.retrying_alternative': (data) => {
       if (currentSessionID === data.sessionID) {
         ws.send(JSON.stringify({ type: 'session.retrying_alternative', data }));
+      }
+    },
+    'session.diff': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.diff', data }));
       }
     },
     'error': (error) => {

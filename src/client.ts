@@ -219,6 +219,15 @@ export class OctoolsClient extends EventEmitter {
           }
           break;
 
+        case 'session.diff':
+          if (properties.sessionID && properties.diff) {
+            this.emit('session.diff', {
+              sessionID: properties.sessionID,
+              diff: properties.diff
+            });
+          }
+          break;
+
         default:
           // Emit raw event for debugging or other types
           this.emit('event', payload);

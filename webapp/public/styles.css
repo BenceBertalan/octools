@@ -783,3 +783,447 @@ input:checked + .slider:before { transform: translateX(16px); }
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+/* Progress Bubbles */
+.progress-bubble {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f5f5f5 100%);
+    border: 1px solid #90caf9;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin: 8px auto;
+    max-width: 90%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    animation: slideIn 0.2s ease;
+}
+
+.progress-bubble.progress-running {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border-color: #ffb74d;
+    animation: pulse 2s infinite;
+}
+
+.progress-bubble.progress-error {
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+    border-color: #ef5350;
+}
+
+.progress-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.progress-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.progress-status {
+    flex: 1;
+    color: #424242;
+}
+
+.progress-timer {
+    font-size: 11px;
+    color: #757575;
+    font-weight: normal;
+    font-family: monospace;
+}
+
+.progress-task {
+    font-size: 12px;
+    color: #616161;
+    margin-left: 24px;
+    line-height: 1.3;
+}
+
+.progress-completed-summary {
+    background: #e8f5e9;
+    border: 1px solid #81c784;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 8px auto;
+    max-width: 90%;
+    text-align: center;
+    font-size: 12px;
+    color: #2e7d32;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Diff Drawer Button */
+.diff-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.diff-btn:hover {
+    background: #f5f5f5;
+    border-color: #0084ff;
+}
+
+.diff-badge {
+    background: #0084ff;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: bold;
+    min-width: 18px;
+    text-align: center;
+}
+
+/* Diff Drawer */
+.diff-drawer {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 400px;
+    height: 100vh;
+    background: white;
+    border-left: 1px solid var(--border-color);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    transition: right 0.3s ease;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.diff-drawer.open {
+    right: 0;
+}
+
+.diff-drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 999;
+}
+
+.diff-drawer-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.diff-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: #f8f9fa;
+}
+
+.diff-drawer-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #1c1e21;
+}
+
+.diff-drawer-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: #65676b;
+    transition: color 0.2s;
+}
+
+.diff-drawer-close:hover {
+    color: #1c1e21;
+}
+
+.diff-drawer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.diff-drawer-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-color);
+    background: #f8f9fa;
+}
+
+.diff-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #65676b;
+    font-size: 14px;
+}
+
+/* Diff File Items */
+.diff-file-item {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.diff-file-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.diff-file-header:hover {
+    background: #f8f9fa;
+}
+
+.diff-file-toggle {
+    font-size: 12px;
+    color: #65676b;
+    min-width: 12px;
+}
+
+.diff-file-name {
+    flex: 1;
+    font-family: monospace;
+    font-size: 13px;
+    color: #1c1e21;
+    word-break: break-all;
+}
+
+.diff-file-stats {
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.diff-additions {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.diff-deletions {
+    color: #d73a49;
+    font-weight: 600;
+}
+
+.diff-file-content {
+    border-top: 1px solid var(--border-color);
+    background: #f6f8fa;
+    padding: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.diff-loading {
+    text-align: center;
+    padding: 20px;
+    color: #65676b;
+    font-size: 13px;
+}
+
+.diff-error {
+    padding: 12px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    color: #856404;
+    font-size: 12px;
+}
+
+.diff-no-content {
+    padding: 12px;
+    text-align: center;
+    color: #65676b;
+    font-size: 12px;
+}
+
+/* Diff Lines */
+.diff-line {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 2px 8px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.diff-line-add {
+    background: #e6ffed;
+    color: #24292e;
+}
+
+.diff-line-remove {
+    background: #ffeef0;
+    color: #24292e;
+}
+
+.diff-line-header {
+    background: #f1f8ff;
+    color: #586069;
+    font-weight: 600;
+}
+
+.diff-line-context {
+    color: #24292e;
+}
+
+/* Dark Mode Support */
+body.dark .progress-bubble {
+    background: linear-gradient(135deg, #1e3a5f 0%, #263238 100%);
+    border-color: #42a5f5;
+}
+
+body.dark .progress-bubble.progress-running {
+    background: linear-gradient(135deg, #4a3f00 0%, #5d4037 100%);
+    border-color: #ffb74d;
+}
+
+body.dark .progress-bubble.progress-error {
+    background: linear-gradient(135deg, #4a0000 0%, #5d1f1f 100%);
+    border-color: #ef5350;
+}
+
+body.dark .progress-status,
+body.dark .progress-task {
+    color: #e0e0e0;
+}
+
+body.dark .progress-completed-summary {
+    background: #1b5e20;
+    border-color: #4caf50;
+    color: #a5d6a7;
+}
+
+body.dark .diff-btn {
+    background: #2d2d2d;
+    border-color: #404040;
+    color: #e0e0e0;
+}
+
+body.dark .diff-btn:hover {
+    background: #3d3d3d;
+    border-color: #42a5f5;
+}
+
+body.dark .diff-drawer {
+    background: #1e1e1e;
+    border-left-color: #404040;
+}
+
+body.dark .diff-drawer-header,
+body.dark .diff-drawer-footer {
+    background: #2d2d2d;
+    border-color: #404040;
+}
+
+body.dark .diff-drawer-header h3 {
+    color: #e0e0e0;
+}
+
+body.dark .diff-drawer-close {
+    color: #b0b0b0;
+}
+
+body.dark .diff-drawer-close:hover {
+    color: #e0e0e0;
+}
+
+body.dark .diff-file-item {
+    background: #2d2d2d;
+    border-color: #404040;
+}
+
+body.dark .diff-file-header:hover {
+    background: #3d3d3d;
+}
+
+body.dark .diff-file-name {
+    color: #e0e0e0;
+}
+
+body.dark .diff-file-content {
+    background: #1e1e1e;
+}
+
+body.dark .diff-line-add {
+    background: #1a3d1a;
+    color: #d4edda;
+}
+
+body.dark .diff-line-remove {
+    background: #4a1616;
+    color: #f8d7da;
+}
+
+body.dark .diff-line-header {
+    background: #1e3a5f;
+    color: #90caf9;
+}
+
+body.dark .diff-line-context {
+    color: #e0e0e0;
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    50% {
+        box-shadow: 0 4px 8px rgba(255, 183, 77, 0.3);
+    }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .progress-bubble {
+        max-width: 95%;
+        padding: 10px 12px;
+    }
+    
+    .progress-header {
+        font-size: 12px;
+    }
+    
+    .progress-task {
+        font-size: 11px;
+    }
+    
+    .diff-drawer {
+        width: 90%;
+        right: -90%;
+    }
+    
+    .diff-drawer.open {
+        right: 0;
+    }
+}

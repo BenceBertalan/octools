@@ -1,5 +1,6 @@
 // State management
 let currentSession = null;
+let currentSessionID = null;
 let ws = null;
 let currentQuestion = null;
 let agents = [];
@@ -13,6 +14,15 @@ let loadingMore = false;
 
 // Reasoning state
 let reasoningExpanded = new Map(); // messageID -> boolean
+
+// Progress bubbles state
+const progressBubbles = new Map(); // Map<messageID, Map<partID, bubbleElement>>
+const completedTools = new Map();  // Map<messageID, Array<toolName>>
+
+// Session diff state
+const sessionDiffs = new Map(); // Map<sessionID, Array<FileDiff>>
+const expandedDiffs = new Set(); // Set<filename> for tracking expanded files
+let currentDrawerSession = null;
 
 // Helper to get element by ID with error checking
 const getEl = (id) => {
@@ -182,6 +192,29 @@ if (qsModelSelect) {
     qsModelSelect.addEventListener('change', (e) => {
         if (modelSelect) modelSelect.value = e.target.value;
         setCookie('favModel', e.target.value);
+    });
+}
+
+// Diff drawer event listeners
+const diffBtn = document.getElementById('diffBtn');
+const diffDrawerClose = document.getElementById('diffDrawerClose');
+const diffDrawerOverlay = document.getElementById('diffDrawerOverlay');
+const clearDiffBtn = document.getElementById('clearDiffBtn');
+
+if (diffBtn) {
+    diffBtn.addEventListener('click', toggleDiffDrawer);
+}
+if (diffDrawerClose) {
+    diffDrawerClose.addEventListener('click', toggleDiffDrawer);
+}
+if (diffDrawerOverlay) {
+    diffDrawerOverlay.addEventListener('click', toggleDiffDrawer);
+}
+if (clearDiffBtn) {
+    clearDiffBtn.addEventListener('click', () => {
+        if (confirm('Clear all file changes for this session?')) {
+            clearSessionDiffs();
+        }
     });
 }
 
@@ -410,6 +443,313 @@ function updateLoadMoreButton(loading, hasMore = true) {
         btn.disabled = false;
         btn.innerHTML = '📜 Load Earlier Messages (20)';
     }
+}
+
+// Subagent Progress Functions
+function handleSubagentProgress(data) {
+    const { messageID, partID, agent, task, status } = data;
+    
+    // Get or create progress container for this message
+    let messageProgressMap = progressBubbles.get(messageID);
+    if (!messageProgressMap) {
+        messageProgressMap = new Map();
+        progressBubbles.set(messageID, messageProgressMap);
+    }
+    
+    // Check if bubble exists for this part
+    let bubble = messageProgressMap.get(partID);
+    
+    if (status === 'completed') {
+        // Collapse logic: remove individual bubble, update summary
+        if (bubble) {
+            bubble.remove();
+            messageProgressMap.delete(partID);
+        }
+        
+        // Add to completed tools list
+        let completed = completedTools.get(messageID) || [];
+        completed.push(agent);
+        completedTools.set(messageID, completed);
+        
+        // Update or create collapsed summary badge
+        updateCompletedToolsSummary(messageID);
+        
+    } else if (status === 'error') {
+        // Show error state
+        if (!bubble) {
+            bubble = createProgressBubble(messageID, partID);
+            messageProgressMap.set(partID, bubble);
+        }
+        updateProgressBubble(bubble, agent, task, status);
+        
+    } else {
+        // pending or running - show/update bubble
+        if (!bubble) {
+            bubble = createProgressBubble(messageID, partID);
+            messageProgressMap.set(partID, bubble);
+        }
+        updateProgressBubble(bubble, agent, task, status);
+    }
+}
+
+function createProgressBubble(messageID, partID) {
+    const container = document.getElementById('messagesContainer');
+    const bubble = document.createElement('div');
+    bubble.id = `progress-${messageID}-${partID}`;
+    bubble.className = 'progress-bubble';
+    bubble.dataset.messageId = messageID;
+    bubble.dataset.partId = partID;
+    bubble.dataset.startTime = Date.now();
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
+    return bubble;
+}
+
+function updateProgressBubble(bubble, agent, task, status) {
+    const startTime = parseInt(bubble.dataset.startTime);
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    
+    const icons = {
+        pending: '⏳',
+        running: '🔄',
+        error: '❌'
+    };
+    
+    const icon = icons[status] || '🔄';
+    const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+    
+    bubble.innerHTML = `
+        <div class="progress-header">
+            <span class="progress-icon">${icon}</span>
+            <span class="progress-status">${statusText}: ${agent}</span>
+            ${status === 'running' ? `<span class="progress-timer">⏱️ ${elapsed}s</span>` : ''}
+        </div>
+        <div class="progress-task">${escapeHtml(task)}</div>
+    `;
+    
+    bubble.className = `progress-bubble progress-${status}`;
+    
+    // Update timer for running tasks
+    if (status === 'running' && !bubble.dataset.timerInterval) {
+        const intervalId = setInterval(() => {
+            if (!document.contains(bubble)) {
+                clearInterval(intervalId);
+                return;
+            }
+            const timer = bubble.querySelector('.progress-timer');
+            if (timer) {
+                const newElapsed = Math.floor((Date.now() - startTime) / 1000);
+                timer.textContent = `⏱️ ${newElapsed}s`;
+            }
+        }, 1000);
+        bubble.dataset.timerInterval = intervalId;
+    }
+}
+
+function updateCompletedToolsSummary(messageID) {
+    const completed = completedTools.get(messageID) || [];
+    if (completed.length === 0) return;
+    
+    // Remove existing summary
+    const existingSummary = document.getElementById(`completed-summary-${messageID}`);
+    if (existingSummary) existingSummary.remove();
+    
+    // Create new summary badge
+    const container = document.getElementById('messagesContainer');
+    const summary = document.createElement('div');
+    summary.id = `completed-summary-${messageID}`;
+    summary.className = 'progress-completed-summary';
+    
+    const displayCount = 3;
+    const displayTools = completed.slice(-displayCount).join(' · ');
+    const moreCount = completed.length > displayCount ? completed.length - displayCount : 0;
+    const moreText = moreCount > 0 ? ` · ${moreCount} more` : '';
+    
+    summary.innerHTML = `✅ ${displayTools}${moreText} completed`;
+    
+    container.appendChild(summary);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Session Diff Functions
+function handleSessionDiff(data) {
+    const { sessionID, diff } = data;
+    
+    // Store diffs for this session
+    let existingDiffs = sessionDiffs.get(sessionID) || [];
+    
+    // Merge new diffs with existing (update if file already exists)
+    diff.forEach(newDiff => {
+        const existingIndex = existingDiffs.findIndex(d => d.file === newDiff.file);
+        if (existingIndex >= 0) {
+            existingDiffs[existingIndex] = newDiff;
+        } else {
+            existingDiffs.push(newDiff);
+        }
+    });
+    
+    sessionDiffs.set(sessionID, existingDiffs);
+    
+    // Update UI if this is the current session
+    if (sessionID === currentSessionID) {
+        updateDiffButton(existingDiffs.length);
+        if (isDiffDrawerOpen()) {
+            renderDiffDrawer(existingDiffs);
+        }
+    }
+}
+
+function updateDiffButton(count) {
+    const diffBtn = document.getElementById('diffBtn');
+    const diffBadge = document.getElementById('diffBadge');
+    const diffBtnText = document.getElementById('diffBtnText');
+    
+    if (count > 0) {
+        diffBtn.style.display = 'inline-flex';
+        diffBadge.textContent = count;
+        diffBadge.style.display = 'inline';
+        diffBtnText.textContent = `📄 Files (${count})`;
+    } else {
+        diffBtn.style.display = 'none';
+    }
+}
+
+function isDiffDrawerOpen() {
+    const drawer = document.getElementById('diffDrawer');
+    return drawer && drawer.classList.contains('open');
+}
+
+function toggleDiffDrawer() {
+    const drawer = document.getElementById('diffDrawer');
+    const overlay = document.getElementById('diffDrawerOverlay');
+    if (!drawer || !overlay) return;
+    
+    const isOpen = drawer.classList.contains('open');
+    
+    if (isOpen) {
+        drawer.classList.remove('open');
+        overlay.classList.remove('visible');
+    } else {
+        drawer.classList.add('open');
+        overlay.classList.add('visible');
+        const diffs = sessionDiffs.get(currentSessionID) || [];
+        renderDiffDrawer(diffs);
+    }
+}
+
+function renderDiffDrawer(diffs) {
+    const content = document.getElementById('diffDrawerContent');
+    const title = document.getElementById('diffDrawerTitle');
+    if (!content || !title) return;
+    
+    title.textContent = `Files Changed (${diffs.length})`;
+    
+    if (diffs.length === 0) {
+        content.innerHTML = '<div class="diff-empty-state">No file changes yet</div>';
+        return;
+    }
+    
+    content.innerHTML = diffs.map(diff => {
+        const isExpanded = expandedDiffs.has(diff.file);
+        const safeFile = escapeHtml(diff.file);
+        const fileId = btoa(diff.file).replace(/=/g, '');
+        return `
+            <div class="diff-file-item" data-file="${safeFile}">
+                <div class="diff-file-header" onclick="toggleFileDiff('${safeFile}')">
+                    <span class="diff-file-toggle">${isExpanded ? '▼' : '▶'}</span>
+                    <span class="diff-file-name">${safeFile}</span>
+                    <span class="diff-file-stats">
+                        <span class="diff-additions">+${diff.additions}</span>
+                        <span class="diff-deletions">-${diff.deletions}</span>
+                    </span>
+                </div>
+                ${isExpanded ? `
+                    <div class="diff-file-content" id="diff-content-${fileId}">
+                        <div class="diff-loading">Loading diff...</div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+    
+    // Load expanded diffs
+    diffs.forEach(diff => {
+        if (expandedDiffs.has(diff.file)) {
+            loadFileDiff(diff);
+        }
+    });
+}
+
+function toggleFileDiff(filename) {
+    if (expandedDiffs.has(filename)) {
+        expandedDiffs.delete(filename);
+    } else {
+        expandedDiffs.add(filename);
+    }
+    
+    const diffs = sessionDiffs.get(currentSessionID) || [];
+    renderDiffDrawer(diffs);
+}
+
+async function loadFileDiff(diff) {
+    const fileId = btoa(diff.file).replace(/=/g, '');
+    const contentId = `diff-content-${fileId}`;
+    const contentDiv = document.getElementById(contentId);
+    if (!contentDiv) return;
+    
+    try {
+        const response = await fetch(`/api/session/${currentSessionID}/diff/${encodeURIComponent(diff.file)}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load diff');
+        }
+        
+        const diffText = await response.text();
+        contentDiv.innerHTML = formatDiffText(diffText);
+        
+    } catch (error) {
+        contentDiv.innerHTML = `
+            <div class="diff-error">
+                ❌ Failed to load diff: ${error.message}
+                <br><small>before: ${diff.before || 'none'}</small>
+                <br><small>after: ${diff.after}</small>
+            </div>
+        `;
+    }
+}
+
+function formatDiffText(diffText) {
+    if (!diffText || diffText.trim() === '') {
+        return '<div class="diff-no-content">No diff content available</div>';
+    }
+    
+    const lines = diffText.split('\n');
+    return lines.map(line => {
+        const escaped = escapeHtml(line);
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+            return `<div class="diff-line diff-line-add">${escaped}</div>`;
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+            return `<div class="diff-line diff-line-remove">${escaped}</div>`;
+        } else if (line.startsWith('@@')) {
+            return `<div class="diff-line diff-line-header">${escaped}</div>`;
+        } else {
+            return `<div class="diff-line diff-line-context">${escaped}</div>`;
+        }
+    }).join('');
+}
+
+function clearSessionDiffs() {
+    if (!currentSessionID) return;
+    
+    sessionDiffs.delete(currentSessionID);
+    expandedDiffs.clear();
+    updateDiffButton(0);
+    renderDiffDrawer([]);
 }
 
 async function sendMessage() {
@@ -784,6 +1124,19 @@ function connectWebSocket() {
                 addMessage('assistant', finalContent || (msgError ? `❌ Error: ${msgError.message}` : '(No content)'), false, !!msgError, false, false, data.message || {});
                 messageBuffer.delete(finalID);
                 removeTypingIndicator('assistant-typing');
+                
+                // Clean up progress bubbles for this message
+                const progressMap = progressBubbles.get(finalID);
+                if (progressMap) {
+                    progressMap.forEach(bubble => bubble.remove());
+                    progressBubbles.delete(finalID);
+                }
+                
+                // Fade completed summary
+                const summary = document.getElementById(`completed-summary-${finalID}`);
+                if (summary) {
+                    summary.style.opacity = '0.7';
+                }
                 break;
             case 'question':
                 currentQuestion = data;
@@ -799,6 +1152,12 @@ function connectWebSocket() {
                 break;
             case 'session.retrying_alternative':
                 addMessage('assistant', `♻️ **Auto-Retry**: Retrying with **${data.model?.modelID}**...`, false, false, false, true);
+                break;
+            case 'subagent.progress':
+                handleSubagentProgress(data);
+                break;
+            case 'session.diff':
+                handleSessionDiff(data);
                 break;
         }
     };
@@ -957,6 +1316,17 @@ async function loadExistingSessions(search = '') {
 async function connectToSession(session) {
     console.log('[UI] Connecting to session:', session.id);
     currentSession = session;
+    currentSessionID = session.id;
+    currentDrawerSession = session.id;
+    
+    // Reset diff drawer for new session
+    expandedDiffs.clear();
+    const diffs = sessionDiffs.get(session.id) || [];
+    updateDiffButton(diffs.length);
+    if (isDiffDrawerOpen()) {
+        renderDiffDrawer(diffs);
+    }
+    
     try {
         // Fetch all messages without limit
         const response = await fetch(`/api/session/${session.id}/messages`);
