@@ -139,14 +139,9 @@ app.get('/api/session/:sessionID/messages', async (req, res) => {
 });
 
 app.post('/api/session/:sessionID/message', async (req, res) => {
+  console.log(`[API] Message to session ${req.params.sessionID}:`, req.body.text?.substring(0, 50));
   try {
     const { text, agent, model } = req.body;
-    
-    // We need to support passing agent/model to sendMessage if the library supports it
-    // Looking at src/client.ts, sendMessage only takes sessionID and text.
-    // However, the OpenCode API supports parts or session-level overrides.
-    
-    // Let's modify sendMessage in client.ts to accept options
     const message = await octoolsClient.sendMessage(req.params.sessionID, text, { agent, model });
     
     // Update activity
@@ -155,8 +150,10 @@ app.post('/api/session/:sessionID/message', async (req, res) => {
       monitor.lastActivity = Date.now();
     }
     
+    console.log(`[API] Message response success:`, !!message);
     res.json(message);
   } catch (error) {
+    console.error(`[API] Send message error:`, error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -192,6 +189,7 @@ wss.on('connection', (ws) => {
   const eventHandlers = {
     'session.status': (data) => {
       if (currentSessionID === data.sessionID) {
+        console.log(`[WS] Sending session.status (${data.status}) to client`);
         const monitor = sessions.get(data.sessionID);
         if (monitor) {
           const sessionStatus = (data.status && data.status.type) || data.status || data.type;
@@ -210,7 +208,10 @@ wss.on('connection', (ws) => {
     },
     'message.delta': (data) => {
       if (currentSessionID === data.sessionID) {
+        console.log(`[WS] Sending message.delta to client`);
         ws.send(JSON.stringify({ type: 'message.delta', data }));
+      } else {
+        console.log(`[WS] Skipping message.delta: currentSessionID=${currentSessionID} vs eventSessionID=${data.sessionID}`);
       }
     },
     'message.part': (data) => {
@@ -274,7 +275,7 @@ wss.on('connection', (ws) => {
       
       if (data.type === 'subscribe') {
         currentSessionID = data.sessionID;
-        console.log(`Client subscribed to session: ${currentSessionID}`);
+        console.log(`[WS] Client subscribed to session: ${currentSessionID}`);
       }
     } catch (error) {
       console.error('WebSocket message error:', error);

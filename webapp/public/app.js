@@ -188,6 +188,18 @@ function applyStoredPreferences() {
     }
 }
 
+// Safe JSON helper
+async function safeJson(response) {
+    const text = await response.text();
+    if (!text) return null;
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        console.error('Failed to parse JSON:', text);
+        throw new Error('Invalid JSON response from server');
+    }
+}
+
 async function sendMessage() {
     if (!currentSession) {
         alert('Please connect to a session first');
@@ -217,11 +229,10 @@ async function sendMessage() {
         });
         
         if (!response.ok) {
+            const error = await safeJson(response) || { error: response.statusText };
             if (response.status === 401) {
-                const error = await response.json();
                 showAuthError(error.details || error.error || 'Unauthorized');
             } else {
-                const error = await response.json();
                 throw new Error(error.error || response.statusText);
             }
         }
@@ -580,7 +591,9 @@ function connectWebSocket() {
 async function syncSessionState(sessionID) {
     if (!sessionID) return;
     try {
-        const messages = await fetch(`/api/session/${sessionID}/messages?limit=20`).then(r => r.json());
+        const response = await fetch(`/api/session/${sessionID}/messages?limit=20`);
+        if (!response.ok) throw new Error('Failed to fetch messages');
+        const messages = await safeJson(response) || [];
         let added = 0;
         messages.forEach(msg => {
             if (!document.getElementById('msg-' + msg.info.id)) {
@@ -609,8 +622,8 @@ if (reconnectBtn) {
 async function loadAgentsAndModels() {
     try {
         const [agentsRes, modelsRes] = await Promise.all([fetch('/api/agents'), fetch('/api/models')]);
-        agents = await agentsRes.json();
-        models = await modelsRes.json();
+        agents = await safeJson(agentsRes) || [];
+        models = await safeJson(modelsRes) || [];
         const populateSelect = (select, items, label, isModel = false) => {
             if (!select) return;
             select.innerHTML = `<option value="">${label}</option>`;
@@ -657,7 +670,9 @@ if (createSessionBtn) {
                 body: JSON.stringify({ agent, model, secondaryModel, directory })
             });
             if (!res.ok) throw new Error('Create failed');
-            currentSession = await res.json();
+            currentSession = await safeJson(res);
+            if (!currentSession) throw new Error('Empty response from server');
+            
             if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
             updateStatus('idle'); 
             if (settingsModal) settingsModal.classList.remove('active');
@@ -675,7 +690,11 @@ async function loadExistingSessions(search = '') {
         const start = Date.now() - (7 * 24 * 60 * 60 * 1000);
         let url = `/api/sessions?limit=50&start=${start}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
-        const sessionsData = await fetch(url).then(r => r.json());
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch sessions');
+        const sessionsData = await safeJson(response) || [];
+        
         sessionList.innerHTML = '';
         if (sessionsData.length === 0) { sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: #90949c;">No sessions found</div>'; return; }
         const groups = {};
@@ -691,13 +710,17 @@ async function loadExistingSessions(search = '') {
                 item.onclick = () => connectToSession(s); sessionList.appendChild(item);
             });
         });
-    } catch (e) { sessionList.innerHTML = 'Error'; }
+    } catch (e) { sessionList.innerHTML = 'Error: ' + e.message; }
 }
 
 async function connectToSession(session) {
+    console.log('[UI] Connecting to session:', session.id);
     currentSession = session;
     try {
-        const messages = await fetch(`/api/session/${session.id}/messages?limit=20`).then(r => r.json());
+        const response = await fetch(`/api/session/${session.id}/messages?limit=20`);
+        if (!response.ok) throw new Error('Failed to fetch messages');
+        const messages = await safeJson(response) || [];
+        
         if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
         updateStatus('idle'); 
         if (settingsModal) settingsModal.classList.remove('active');
@@ -706,17 +729,19 @@ async function connectToSession(session) {
             const text = msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n');
             if (text) addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info);
         });
-    } catch (e) { addEvent('Error', 'Connect failed'); }
+    } catch (e) { addEvent('Error', 'Connect failed: ' + e.message); }
 }
 
 async function loadSessionHistory(id) {
     try {
-        const msgs = await fetch(`/api/session/${id}/messages?limit=20`).then(r => r.json());
+        const response = await fetch(`/api/session/${id}/messages?limit=20`);
+        if (!response.ok) throw new Error('Failed to fetch history');
+        const msgs = await safeJson(response) || [];
         msgs.forEach(msg => {
             const text = msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n');
             if (text) addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info);
         });
-    } catch (e) {}
+    } catch (e) { console.error('History load failed:', e); }
 }
 
 async function fetchLogs() {
@@ -724,7 +749,7 @@ async function fetchLogs() {
     try {
         const url = currentSession ? `/api/logs?sessionID=${currentSession.id}` : '/api/logs';
         const response = await fetch(url);
-        const logs = await response.json();
+        const logs = await safeJson(response) || [];
         if (logCount) logCount.textContent = `${logs.length} events`;
         logsContainer.innerHTML = '';
         if (logs.length === 0) { logsContainer.innerHTML = '<div class="log-item">No events found.</div>'; return; }
@@ -741,17 +766,23 @@ async function fetchLogs() {
 }
 
 async function init() {
+    console.log('[System] Initializing app...');
     applyStoredPreferences();
+    
+    // Show modal immediately if no session
+    if (!currentSession && settingsModal) {
+        console.log('[System] No session, showing settings modal');
+        settingsModal.classList.add('active');
+        loadExistingSessions();
+    }
+
     try {
         connectWebSocket();
         await loadAgentsAndModels();
-        setTimeout(() => { 
-            if (!currentSession && settingsModal) { 
-                settingsModal.classList.add('active'); 
-                loadExistingSessions(); 
-            } 
-        }, 500);
-    } catch (e) { console.error('Init failed:', e); }
+    } catch (e) { 
+        console.error('Init error:', e); 
+        addEvent('Error', 'Initialization error: ' + e.message);
+    }
 }
 
 init();

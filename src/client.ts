@@ -73,7 +73,12 @@ export class OctoolsClient extends EventEmitter {
     this.lastServerHeartbeat = Date.now();
     
     try {
-      const payload: BusEvent = JSON.parse(event.data);
+      const data = JSON.parse(event.data);
+      // OpenCode returns { directory, payload: { type, properties } }
+      const payload: BusEvent = data.payload || data;
+      
+      const sessionID = payload.properties?.sessionID || payload.properties?.info?.sessionID || payload.properties?.part?.sessionID;
+      console.log(`[Octools] SSE Event: ${payload.type} (Session: ${sessionID}) - Raw: ${JSON.stringify(data).substring(0, 200)}`);
       
       // Raw logging
       this.rawEvents.push({ timestamp: Date.now(), payload });
@@ -138,7 +143,7 @@ export class OctoolsClient extends EventEmitter {
                 status
               });
             }
-
++           console.log(`[Octools] Emitting message.delta for session ${properties.part.sessionID}`);
             this.emit('message.delta', {
               sessionID: properties.part.sessionID,
               messageID: properties.part.messageID,
@@ -258,7 +263,8 @@ export class OctoolsClient extends EventEmitter {
       }
       throw new Error(`Failed to create session: ${res.statusText}`);
     }
-    const session = await res.json() as Session;
+    const text = await res.text();
+    const session = JSON.parse(text) as Session;
     
     // Store model config
     this.sessionModels.set(session.id, {
@@ -275,7 +281,8 @@ export class OctoolsClient extends EventEmitter {
       headers: this.headers
     });
     if (!res.ok) throw new Error(`Failed to load session: ${res.statusText}`);
-    return res.json() as Promise<Session>;
+    const text = await res.text();
+    return JSON.parse(text) as Session;
   }
 
   public async listSessions(options?: { limit?: number; directory?: string; search?: string; start?: number }): Promise<Session[]> {
@@ -289,7 +296,8 @@ export class OctoolsClient extends EventEmitter {
       headers: this.headers
     });
     if (!res.ok) throw new Error(`Failed to list sessions: ${res.statusText}`);
-    return res.json() as Promise<Session[]>;
+    const text = await res.text();
+    return JSON.parse(text) as Session[];
   }
 
   public async getMessages(sessionID: string, options?: { limit?: number }): Promise<Message[]> {
@@ -303,7 +311,8 @@ export class OctoolsClient extends EventEmitter {
      });
      
      if (!res.ok) throw new Error(`Failed to get messages: ${res.statusText}`);
-     return res.json() as Promise<Message[]>;
+     const text = await res.text();
+     return JSON.parse(text) as Message[];
   }
 
   public async sendMessage(sessionID: string, text: string, options?: { 
@@ -316,29 +325,41 @@ export class OctoolsClient extends EventEmitter {
     const models = this.sessionModels.get(sessionID);
     const activeModel = options?.model || models?.current;
 
+    const body: any = { 
+      parts: [{ type: 'text', text }]
+    };
+    if (options?.agent) body.agent = options.agent;
+    if (activeModel) body.model = activeModel;
+
+    console.log(`[Octools] POST /session/${sessionID}/message body:`, JSON.stringify(body));
+
     const res = await fetch(`${this.config.baseUrl}/session/${sessionID}/message`, {
       method: 'POST',
       headers: this.headers,
-      body: JSON.stringify({ 
-        parts: [{ type: 'text', text }],
-        agent: options?.agent,
-        model: activeModel
-      })
+      body: JSON.stringify(body)
     });
     if (!res.ok) {
       if (res.status === 401) {
         throw new AuthError('Authentication failed: Unauthorized');
       }
       const errorText = await res.text();
+      console.error(`[Octools] Send message failed: ${res.status} ${res.statusText} - ${errorText}`);
       throw new Error(`Failed to send message: ${res.statusText} - ${errorText}`);
     }
     
     // API returns the created assistant message (initial state)
-    // Note: The OpenCode API seems to return a stream of JSON or a JSON object.
-    // Based on `server/routes/session.ts`: `stream.write(JSON.stringify(msg))`
-    // It likely returns one JSON object and then closes, or maybe streams more.
-    // We'll parse it as JSON.
-    return res.json() as Promise<Message>;
+    console.log(`[Octools] Message sent, awaiting response body...`);
+    const textRes = await res.text();
+    console.log(`[Octools] Raw response received (${textRes.length} bytes)`);
+    try {
+      return JSON.parse(textRes) as Message;
+    } catch (e: any) {
+      console.error(`[Octools] Failed to parse response as JSON. Error: ${e.message}`);
+      console.error(`[Octools] Raw content: "${textRes}"`);
+      // If it's empty but the request was successful, return a dummy message
+      if (!textRes) return { parts: [], info: { role: 'assistant', id: 'unknown' } } as any;
+      throw new Error(`Invalid JSON response: ${textRes.substring(0, 100)}`);
+    }
   }
 
   private async triggerAlternativeRetry(sessionID: string, reason: string) {
@@ -362,7 +383,7 @@ export class OctoolsClient extends EventEmitter {
     try {
       // Abort first to stop the current stuck retry/generation
       console.log(`[Octools] Aborting session ${sessionID} before alternative retry`);
-      await this.abortSession(sessionID).catch(e => console.warn(`[Octools] Abort failed (might already be stopped):`, e.message));
+      await this.abortSession(sessionID).catch((e: any) => console.warn(`[Octools] Abort failed (might already be stopped):`, e.message));
       
       // Wait a bit for the session to settle
       await new Promise(resolve => setTimeout(resolve, 500));
