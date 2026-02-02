@@ -370,7 +370,7 @@ export class OctoolsClient extends EventEmitter {
   public async sendMessage(sessionID: string, text: string, options?: { 
     agent?: string; 
     model?: { providerID: string; modelID: string };
-    prompt?: string;
+    system?: string;
   }): Promise<Message> {
     // Save last user prompt for alternative model retry
     this.lastUserPrompts.set(sessionID, { text, options });
@@ -383,7 +383,7 @@ export class OctoolsClient extends EventEmitter {
     };
     if (options?.agent) body.agent = options.agent;
     if (activeModel) body.model = activeModel;
-    if (options?.prompt) body.prompt = options.prompt;
+    if (options?.system) body.system = options.system;
 
     console.log(`[Octools] POST /session/${sessionID}/message body:`, JSON.stringify(body));
 

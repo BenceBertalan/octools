@@ -190,13 +190,13 @@ app.get('/api/session/:sessionID/messages', async (req, res) => {
 app.post('/api/session/:sessionID/message', async (req, res) => {
   console.log(`[API] Message to session ${req.params.sessionID}:`, req.body.text?.substring(0, 50));
   try {
-    const { text, agent, model, prompt } = req.body;
+    const { text, agent, model, system } = req.body;
     const options = { agent, model };
     
-    // Include prompt if provided
-    if (prompt) {
-      options.prompt = prompt;
-      console.log(`[API] Using custom prompt for agent ${agent}`);
+    // Include system prompt if provided
+    if (system) {
+      options.system = system;
+      console.log(`[API] Using custom system prompt for agent ${agent}`);
     }
     
     const message = await octoolsClient.sendMessage(req.params.sessionID, text, options);

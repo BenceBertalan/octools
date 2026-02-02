@@ -110,8 +110,8 @@ async function runTests() {
     console.log('\nFixed features:');
     console.log('1. ✅ Model Priority dropdown now groups models by provider');
     console.log('2. ✅ Tab animation includes GPU acceleration and anti-flicker');
-    console.log('3. ✅ System prompts from Agent Settings are now sent with messages');
-    console.log('4. ✅ Server and client support custom prompts in message payload');
+    console.log('3. ✅ FIXED: Using "system" field instead of "prompt" (matches OpenCode API)');
+    console.log('4. ✅ Server and client now correctly pass system prompts to OpenCode');
 }
 
 runTests().catch(console.error);

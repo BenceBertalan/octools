@@ -2900,14 +2900,14 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
         }
     }
 
-    // Get agent's custom prompt if configured
-    let prompt = undefined;
+    // Get agent's custom system prompt if configured
+    let systemPrompt = undefined;
     if (agent) {
         try {
             const config = await fetch('/api/config').then(r => r.json());
             if (config.agent && config.agent[agent] && config.agent[agent].prompt) {
-                prompt = config.agent[agent].prompt;
-                console.log('[DEBUG] Using custom prompt for agent:', agent);
+                systemPrompt = config.agent[agent].prompt;
+                console.log('[DEBUG] Using custom system prompt for agent:', agent);
             }
         } catch (error) {
             console.error('Failed to fetch agent config:', error);
@@ -2919,8 +2919,8 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
     
     try {
         const payload = { text, agent, model };
-        if (prompt) {
-            payload.prompt = prompt;
+        if (systemPrompt) {
+            payload.system = systemPrompt;
         }
         
         const response = await fetch(`/api/session/${currentSession.id}/message`, {
