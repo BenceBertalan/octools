@@ -376,6 +376,34 @@ function handleSessionUpdated(data) {
     }
 }
 
+function handleSessionError(data) {
+    if (!data.error) return;
+    
+    const error = data.error;
+    const errorName = error.name || 'Error';
+    const errorMessage = error.message || 'An unknown error occurred';
+    const errorDetails = error.details || error.stack;
+    
+    // Build error message
+    let displayMessage = `❌ **${errorName}**: ${errorMessage}`;
+    
+    // Add details if available (but keep it concise)
+    if (errorDetails && typeof errorDetails === 'string' && errorDetails !== errorMessage) {
+        const detailsPreview = errorDetails.split('\n')[0].substring(0, 150);
+        if (detailsPreview) {
+            displayMessage += `\n\n\`${detailsPreview}${errorDetails.length > 150 ? '...' : ''}\``;
+        }
+    }
+    
+    // Add error message to chat with error styling
+    addMessage('assistant', displayMessage, false, true, false, false, {});
+    
+    // Also update status to show error state
+    updateStatus('error', `Error: ${errorName}`);
+    
+    console.error('[Session Error]', error);
+}
+
 // Safe JSON helper
 async function safeJson(response) {
     const text = await response.text();
@@ -1308,6 +1336,12 @@ function connectWebSocket() {
                 break;
             case 'session.updated':
                 handleSessionUpdated(data);
+                break;
+            case 'session.error':
+                handleSessionError(data);
+                break;
+            case 'session.error.auth':
+                showAuthError(data.error?.message || 'Authentication failed');
                 break;
         }
     };
