@@ -167,7 +167,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // Add swipe gesture support for tab switching
-const tabOrder = ['chat', 'events', 'tools'];
+const tabOrder = ['chat', 'tools'];
 let touchStartX = 0;
 let touchStartY = 0;
 let touchEndX = 0;
