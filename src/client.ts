@@ -278,10 +278,12 @@ export class OctoolsClient extends EventEmitter {
     return res.json() as Promise<Session>;
   }
 
-  public async listSessions(options?: { limit?: number; directory?: string }): Promise<Session[]> {
+  public async listSessions(options?: { limit?: number; directory?: string; search?: string; start?: number }): Promise<Session[]> {
     const url = new URL(`${this.config.baseUrl}/session`);
     if (options?.limit) url.searchParams.set('limit', options.limit.toString());
     if (options?.directory) url.searchParams.set('directory', options.directory);
+    if (options?.search) url.searchParams.set('search', options.search);
+    if (options?.start) url.searchParams.set('start', options.start.toString());
 
     const res = await fetch(url.toString(), {
       headers: this.headers

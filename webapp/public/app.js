@@ -28,12 +28,38 @@ const modelSelect = document.getElementById('modelSelect');
 const secondaryModelSelect = document.getElementById('secondaryModelSelect');
 const directoryInput = document.getElementById('directoryInput');
 const createSessionBtn = document.getElementById('createSessionBtn');
+const sessionSearch = document.getElementById('sessionSearch');
 const qsAgentSelect = document.getElementById('qsAgentSelect');
 const qsModelSelect = document.getElementById('qsModelSelect');
 const sessionList = document.getElementById('sessionList');
-const hideReasoningCheckbox = document.getElementById('hideReasoning');
-const darkThemeCheckbox = document.getElementById('darkTheme');
-// Tab switching
+
+// Settings Tab switching
+document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tab = btn.dataset.settingsTab;
+        
+        document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.remove('active'));
+        
+        btn.classList.add('active');
+        document.getElementById(tab + 'SessionsTab').classList.add('active');
+        
+        if (tab === 'existing') {
+            loadExistingSessions();
+        }
+    });
+});
+
+// Search debouncing
+let searchTimeout = null;
+sessionSearch.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        loadExistingSessions(sessionSearch.value);
+    }, 300);
+});
+
+// Tab switching (Main)
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const tab = btn.dataset.tab;
@@ -819,10 +845,18 @@ createSessionBtn.addEventListener('click', async () => {
     }
 });
 
-async function loadExistingSessions() {
+async function loadExistingSessions(search = '') {
     try {
         sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: #90949c;">Loading sessions...</div>';
-        const response = await fetch('/api/sessions?limit=20');
+        
+        // Load sessions from the last week
+        const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        let url = `/api/sessions?limit=50&start=${oneWeekAgo}`;
+        if (search) {
+            url += `&search=${encodeURIComponent(search)}`;
+        }
+        
+        const response = await fetch(url);
         const sessions = await response.json();
         
         sessionList.innerHTML = '';
@@ -831,25 +865,47 @@ async function loadExistingSessions() {
             return;
         }
 
+        // Grouping logic
+        const groups = {};
+        const today = new Date().toDateString();
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+
         sessions.forEach(session => {
-            const item = document.createElement('div');
-            item.className = 'session-item';
+            const date = new Date(session.time.updated);
+            let groupName = date.toDateString();
             
-            const title = session.title || session.id.substring(0, 12);
-            const date = new Date(session.time.updated).toLocaleDateString(undefined, { 
-                month: 'short', 
-                day: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit' 
+            if (groupName === today) groupName = 'Today';
+            else if (groupName === yesterday) groupName = 'Yesterday';
+            else groupName = date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+
+            if (!groups[groupName]) groups[groupName] = [];
+            groups[groupName].push(session);
+        });
+
+        Object.keys(groups).forEach(groupName => {
+            const header = document.createElement('div');
+            header.className = 'session-group-header';
+            header.textContent = groupName;
+            sessionList.appendChild(header);
+
+            groups[groupName].forEach(session => {
+                const item = document.createElement('div');
+                item.className = 'session-item';
+                
+                const title = session.title || session.id.substring(0, 12);
+                const timeStr = new Date(session.time.updated).toLocaleTimeString(undefined, { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+
+                item.innerHTML = `
+                    <div class="session-item-title">${title}</div>
+                    <div class="session-item-date">${timeStr}</div>
+                `;
+
+                item.onclick = () => connectToSession(session);
+                sessionList.appendChild(item);
             });
-
-            item.innerHTML = `
-                <div class="session-item-title">${title}</div>
-                <div class="session-item-date">${date}</div>
-            `;
-
-            item.onclick = () => connectToSession(session);
-            sessionList.appendChild(item);
         });
     } catch (error) {
         console.error('List sessions error:', error);
@@ -858,15 +914,56 @@ async function loadExistingSessions() {
 }
 
 async function connectToSession(session) {
+    console.log('Connecting to session:', session);
     currentSession = session;
-    if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
+    
+    // Apply session state to UI
+    try {
+        const messages = await fetch(`/api/session/${session.id}/messages?limit=20`).then(r => r.json());
+        
+        // Find last user message to restore agent/model state
+        let lastUserMsg = null;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].info.role === 'user') {
+                lastUserMsg = messages[i];
+                break;
+            }
+        }
+
+        if (lastUserMsg) {
+            const info = lastUserMsg.info;
+            if (info.agent) {
+                qsAgentSelect.value = info.agent;
+                agentSelect.value = info.agent;
+            }
+            if (info.modelID) {
+                const modelVal = JSON.stringify({ providerID: info.providerID, modelID: info.modelID });
+                qsModelSelect.value = modelVal;
+                modelSelect.value = modelVal;
+            }
+        }
+        
+        // Re-connect WebSocket
+        if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
+        }
+        
+        updateStatus('idle', `Session: ${session.id.substring(0, 8)}`);
+        settingsModal.classList.remove('active');
+        messagesContainer.innerHTML = '';
+        addMessage('assistant', `Connected to session: **${session.title || session.id}**`);
+        
+        // Load last 20 messages
+        if (Array.isArray(messages) && messages.length > 0) {
+            messages.forEach(msg => {
+                const text = msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n');
+                if (text) addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info);
+            });
+        }
+    } catch (err) {
+        console.error('Connection failed:', err);
+        addEvent('Error', 'Failed to connect: ' + err.message);
     }
-    updateStatus('idle', `Session: ${session.id.substring(0, 8)}`);
-    settingsModal.classList.remove('active');
-    messagesContainer.innerHTML = '';
-    addMessage('assistant', `Connected to session: **${session.title || session.id}**`);
-    loadSessionHistory(session.id, 20);
 }
 
 async function loadSessionHistory(sessionID, limit = 100) {

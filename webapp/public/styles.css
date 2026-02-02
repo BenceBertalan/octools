@@ -904,7 +904,69 @@ body.dark .message-bubble code {
         max-width: 85%;
     }
     
-    .modal-content {
+/* Settings Tabs */
+.settings-tabs {
+    display: flex;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: white;
+}
+
+body.dark .settings-tabs {
+    background: #242526;
+}
+
+.settings-tab-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #65676b;
+    border-bottom: 3px solid transparent;
+}
+
+.settings-tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.settings-tab-content {
+    display: none;
+}
+
+.settings-tab-content.active {
+    display: block;
+}
+
+/* Session List Grouping */
+.session-group-header {
+    font-size: 11px;
+    font-weight: bold;
+    color: #90949c;
+    text-transform: uppercase;
+    padding: 8px 12px 4px 12px;
+    margin-top: 8px;
+}
+
+#sessionSearch {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+}
+
+body.dark #sessionSearch {
+    background: #3a3b3c;
+    color: white;
+    border-color: #4e4f50;
+}
+
+.modal-content {
         border-radius: 0;
         max-height: 100vh;
         height: 100%;

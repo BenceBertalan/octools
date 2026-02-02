@@ -119,7 +119,9 @@ app.get('/api/session/:sessionID', async (req, res) => {
 app.get('/api/sessions', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 20;
-    const sessions = await octoolsClient.listSessions({ limit });
+    const search = req.query.search;
+    const start = req.query.start ? parseInt(req.query.start) : undefined;
+    const sessions = await octoolsClient.listSessions({ limit, search, start });
     res.json(sessions);
   } catch (error) {
     res.status(500).json({ error: error.message });
