@@ -319,6 +319,69 @@ body.dark .option-item-inline {
     overflow-wrap: break-word;
 }
 
+/* Selective markdown formatting - Code blocks */
+.message-content pre {
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    padding: 12px;
+    margin: 8px 0;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.message-content pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.message-content code {
+    background: rgba(0, 0, 0, 0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+}
+
+/* Dark mode code blocks */
+body.dark .message-content pre {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark .message-content code {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Selective markdown formatting - Headings */
+.message-content h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 12px 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.message-content h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 10px 0 6px 0;
+}
+
+.message-content h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 8px 0 4px 0;
+}
+
+body.dark .message-content h1 {
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
 /* Fix for code blocks and inline code in markdown */
 .message-bubble pre,
 .message-bubble code {

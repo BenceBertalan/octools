@@ -7,6 +7,34 @@ let agents = [];
 let models = [];
 let messageBuffer = new Map();
 
+// Custom markdown formatter - only renders code blocks and headings
+function formatSelectiveMarkdown(text) {
+    if (!text) return text;
+    
+    let html = text;
+    
+    // Escape HTML to prevent injection
+    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // Format code blocks (```language\ncode\n```)
+    html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, function(match, lang, code) {
+        return '<pre><code class="language-' + (lang || 'text') + '">' + code.trim() + '</code></pre>';
+    });
+    
+    // Format inline code (`code`)
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Format headings (# Heading)
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    
+    // Convert newlines to <br> for display
+    html = html.replace(/\n/g, '<br>');
+    
+    return html;
+}
+
 // Pagination state
 let messagesCache = new Map(); // sessionID -> all messages
 let oldestDisplayedIndex = new Map(); // sessionID -> index
@@ -167,8 +195,8 @@ function switchToRichMode() {
     if (inputContainer) inputContainer.classList.add('rich-mode');
     
     if (richEditor) {
-        // Show plain text (no markdown rendering)
-        richEditor.textContent = simpleText || '';
+        // Show selectively formatted markdown (code blocks & headings only)
+        richEditor.innerHTML = formatSelectiveMarkdown(simpleText || '');
         richEditor.focus();
     }
 }
@@ -406,8 +434,8 @@ function showEditMessageModal(messageText) {
     originalMessageText = messageText;
     
     if (editRichEditor) {
-        // Show plain text for editing (no markdown rendering)
-        editRichEditor.textContent = messageText;
+        // Show selectively formatted markdown (code blocks & headings only)
+        editRichEditor.innerHTML = formatSelectiveMarkdown(messageText);
     }
     
     if (editMessageModal) {
@@ -843,8 +871,8 @@ function createReasoningSection(reasoningParts, messageID) {
     const content = document.createElement('div');
     content.className = 'reasoning-content' + (isExpanded ? ' expanded' : '');
     
-    // Show plain text (no markdown rendering)
-    content.textContent = reasoningText;
+    // Show selectively formatted markdown (code blocks & headings only)
+    content.innerHTML = formatSelectiveMarkdown(reasoningText);
     
     toggle.onclick = (e) => {
         e.stopPropagation();
@@ -997,8 +1025,8 @@ async function loadMoreMessages() {
             
             const content = document.createElement('div');
             content.className = 'message-content';
-            // Show plain text (no markdown rendering)
-            content.textContent = text;
+            // Show selectively formatted markdown (code blocks & headings only)
+            content.innerHTML = formatSelectiveMarkdown(text);
             bubble.appendChild(content);
             
             if (msg.info.error) bubble.classList.add('error');
@@ -1445,8 +1473,10 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
         if (messagesContainer) messagesContainer.appendChild(streamMsg);
     }
     
-    // Show plain text (no markdown rendering)
-    content.textContent = text;
+    
+    const content = streamMsg.querySelector('.message-content') || streamMsg;
+    // Show selectively formatted markdown (code blocks & headings only)
+    content.innerHTML = formatSelectiveMarkdown(text);
     if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -1476,8 +1506,8 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
 
     const content = document.createElement('div');
     content.className = 'message-content';
-    // Show plain text (no markdown rendering)
-    content.textContent = text;
+    // Show selectively formatted markdown (code blocks & headings only)
+    content.innerHTML = formatSelectiveMarkdown(text);
     bubble.appendChild(content);
 
     // Add edit button for user messages
