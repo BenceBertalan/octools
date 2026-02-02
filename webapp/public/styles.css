@@ -633,7 +633,14 @@ body.dark .form-group select, body.dark .qs-item select {
 .btn-primary:active { transform: scale(0.98); }
 
 /* Events & Logs */
-.events-container, .logs-container { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.events-container, .logs-container { 
+    padding: 16px; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
+    flex: 1;
+    overflow-y: auto;
+}
 .event-item { background: white; border-radius: 8px; padding: 12px; border: 1px solid var(--border-color); }
 .event-header { font-weight: 600; font-size: 12px; color: #65676b; text-transform: uppercase; margin-bottom: 4px; }
 .event-body { font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
