@@ -94,6 +94,7 @@
                                 placeholder="Type a message..." 
                                 rows="1"
                             ></textarea>
+                            <button id="saveToNotesBtn" class="save-to-notes-btn" title="Save to Notes">📌</button>
                             <button id="toggleRichBtn" class="toggle-rich-btn" title="Switch to Rich Editor">📝</button>
                         </div>
 
@@ -109,6 +110,7 @@
                                 <button class="md-btn" data-format="indent" title="Increase Indent">→</button>
                                 <button class="md-btn" data-format="outdent" title="Decrease Indent">←</button>
                                 <div class="toolbar-spacer"></div>
+                                <button id="saveToNotesRichBtn" class="md-btn" title="Save to Notes">📌</button>
                                 <button id="toggleSimpleBtn" class="toggle-simple-btn">💾 Simple</button>
                             </div>
                             <div 
@@ -488,12 +490,79 @@
     <div class="modal" id="favoritesModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>⭐ Favorite Messages</h3>
+                <h3 id="favoritesModalTitle">⭐ Favorites & Notes</h3>
                 <button class="close-btn" id="closeFavorites">&times;</button>
             </div>
+            
+            <div class="settings-tabs">
+                <button class="settings-tab-btn active" data-favorites-tab="favorites">⭐ Favorites</button>
+                <button class="settings-tab-btn" data-favorites-tab="notes">📝 Notes</button>
+            </div>
+            
             <div class="modal-body">
-                <div id="favoritesList" class="favorites-list">
-                    <div class="favorites-empty">No favorite messages yet. Star messages to save them here!</div>
+                <div id="favoritesTab" class="favorites-tab-content active">
+                    <div id="favoritesList" class="favorites-list">
+                        <div class="favorites-empty">No favorite messages yet. Star messages to save them here!</div>
+                    </div>
+                </div>
+                
+                <div id="notesListTab" class="favorites-tab-content" style="display: none;">
+                    <div class="notes-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div class="notes-scope-toggle">
+                            <button class="scope-btn active" data-scope="session">📌 Session</button>
+                            <button class="scope-btn" data-scope="global">🌐 Global</button>
+                        </div>
+                        <button class="btn-primary" id="newNoteBtn" style="padding: 6px 12px; font-size: 13px;">+ New Note</button>
+                    </div>
+                    <div id="notesList" class="notes-list">
+                        <div class="notes-empty">No notes yet. Create your first note!</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notes Editor Modal -->
+    <div class="modal" id="notesModal">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3 id="notesModalTitle">📝 New Note</h3>
+                <button class="close-btn" id="closeNotes">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <input type="text" id="noteTitle" placeholder="Note title..." style="font-size: 16px; font-weight: 600;">
+                </div>
+                
+                <div class="notes-scope-selector" style="margin-bottom: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #666;">
+                        <input type="checkbox" id="noteSessionScope">
+                        <span>Save to current session only</span>
+                    </label>
+                </div>
+                
+                <div class="markdown-toolbar" id="noteMarkdownToolbar">
+                    <button class="md-btn" data-format="bold" title="Bold">B</button>
+                    <button class="md-btn" data-format="italic" title="Italic">I</button>
+                    <button class="md-btn" data-format="code" title="Inline Code">C</button>
+                    <button class="md-btn" data-format="codeblock" title="Code Block">`</button>
+                    <button class="md-btn" data-format="heading" title="Heading">#</button>
+                    <button class="md-btn" data-format="list" title="List">L</button>
+                    <button class="md-btn" data-format="indent" title="Increase Indent">→</button>
+                    <button class="md-btn" data-format="outdent" title="Decrease Indent">←</button>
+                </div>
+                
+                <div 
+                    id="noteEditor" 
+                    class="rich-editor" 
+                    contenteditable="true" 
+                    placeholder="Write your note here... You can use markdown formatting."
+                ></div>
+                
+                <div class="notes-actions" style="display: flex; gap: 8px; margin-top: 16px;">
+                    <button class="btn-primary" id="saveNoteBtn" style="flex: 1;">💾 Save</button>
+                    <button class="btn-primary" id="sendNoteBtn" style="flex: 1;">➤ Send as Prompt</button>
+                    <button class="btn-secondary" id="deleteNoteBtn" style="display: none;">🗑️ Delete</button>
                 </div>
             </div>
         </div>

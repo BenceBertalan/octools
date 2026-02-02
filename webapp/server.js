@@ -24,6 +24,13 @@ let globalConfig = {
   }
 };
 
+// In-memory notes storage
+// Structure: { global: [...], sessions: { sessionID: [...] } }
+let notesStorage = {
+  global: [],
+  sessions: {}
+};
+
 const octoolsClient = new OctoolsClient({
   baseUrl: OPENCODE_URL,
   autoConnect: true,
@@ -76,6 +83,109 @@ app.patch('/api/config', async (req, res) => {
       globalConfig.model_priority = { ...globalConfig.model_priority, ...req.body.model_priority };
     }
     res.json(globalConfig);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Notes API endpoints
+// Get notes (global or session-specific)
+app.get('/api/notes', async (req, res) => {
+  try {
+    const { sessionID } = req.query;
+    if (sessionID) {
+      // Return session-specific notes
+      res.json(notesStorage.sessions[sessionID] || []);
+    } else {
+      // Return global notes
+      res.json(notesStorage.global);
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create a new note
+app.post('/api/notes', async (req, res) => {
+  try {
+    const { title, content, sessionID } = req.body;
+    const note = {
+      id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: title || 'Untitled Note',
+      content: content || '',
+      sessionID: sessionID || null,
+      created: Date.now(),
+      updated: Date.now()
+    };
+    
+    if (sessionID) {
+      // Add to session-specific notes
+      if (!notesStorage.sessions[sessionID]) {
+        notesStorage.sessions[sessionID] = [];
+      }
+      notesStorage.sessions[sessionID].push(note);
+    } else {
+      // Add to global notes
+      notesStorage.global.push(note);
+    }
+    
+    res.json(note);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update a note
+app.patch('/api/notes/:noteID', async (req, res) => {
+  try {
+    const { noteID } = req.params;
+    const { title, content, sessionID } = req.body;
+    
+    // Find and update the note
+    let found = false;
+    const updateNote = (note) => {
+      if (note.id === noteID) {
+        if (title !== undefined) note.title = title;
+        if (content !== undefined) note.content = content;
+        note.updated = Date.now();
+        found = true;
+        return note;
+      }
+      return note;
+    };
+    
+    // Check global notes
+    notesStorage.global = notesStorage.global.map(updateNote);
+    
+    // Check session notes
+    Object.keys(notesStorage.sessions).forEach(sid => {
+      notesStorage.sessions[sid] = notesStorage.sessions[sid].map(updateNote);
+    });
+    
+    if (!found) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a note
+app.delete('/api/notes/:noteID', async (req, res) => {
+  try {
+    const { noteID } = req.params;
+    
+    // Remove from global notes
+    notesStorage.global = notesStorage.global.filter(n => n.id !== noteID);
+    
+    // Remove from session notes
+    Object.keys(notesStorage.sessions).forEach(sid => {
+      notesStorage.sessions[sid] = notesStorage.sessions[sid].filter(n => n.id !== noteID);
+    });
+    
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -126,6 +126,25 @@ const favoritesModal = getEl('favoritesModal');
 const closeFavorites = getEl('closeFavorites');
 const favoritesList = getEl('favoritesList');
 
+// Notes DOM elements
+const notesModal = getEl('notesModal');
+const closeNotes = getEl('closeNotes');
+const notesList = getEl('notesList');
+const newNoteBtn = getEl('newNoteBtn');
+const noteTitle = getEl('noteTitle');
+const noteEditor = getEl('noteEditor');
+const noteSessionScope = getEl('noteSessionScope');
+const saveNoteBtn = getEl('saveNoteBtn');
+const sendNoteBtn = getEl('sendNoteBtn');
+const deleteNoteBtn = getEl('deleteNoteBtn');
+const saveToNotesBtn = getEl('saveToNotesBtn');
+const saveToNotesRichBtn = getEl('saveToNotesRichBtn');
+
+// Notes state
+let currentNoteID = null;
+let currentNotesScope = 'session'; // 'session' or 'global'
+let notesCache = { global: [], session: [] };
+
 // Rich editor DOM elements
 const inputContainer = getEl('inputContainer');
 const simpleInputWrapper = getEl('simpleInputWrapper');
@@ -4141,6 +4160,10 @@ function showFavoritesModal() {
         });
     }
     
+    // Load notes when modal opens
+    loadNotes('session');
+    loadNotes('global');
+    
     favoritesModal.classList.add('active');
 }
 
@@ -4180,6 +4203,361 @@ async function fetchLogs() {
             logsContainer.appendChild(item);
         });
     } catch (e) {}
+}
+
+// ============================================================================
+// NOTES FUNCTIONALITY
+// ============================================================================
+
+// Load notes from server
+async function loadNotes(scope = 'session') {
+    try {
+        const sessionID = scope === 'session' ? currentSession?.id : null;
+        const params = sessionID ? `?sessionID=${sessionID}` : '';
+        const response = await fetch(`/api/notes${params}`);
+        if (!response.ok) throw new Error('Failed to load notes');
+        const notes = await safeJson(response) || [];
+        
+        if (scope === 'session') {
+            notesCache.session = notes;
+        } else {
+            notesCache.global = notes;
+        }
+        
+        renderNotesList();
+    } catch (error) {
+        console.error('Failed to load notes:', error);
+        showToast('Failed to load notes', 'error');
+    }
+}
+
+// Render notes list
+function renderNotesList() {
+    if (!notesList) return;
+    
+    const notes = currentNotesScope === 'session' ? notesCache.session : notesCache.global;
+    
+    if (notes.length === 0) {
+        notesList.innerHTML = '<div class="notes-empty">No notes yet. Create your first note!</div>';
+        return;
+    }
+    
+    notesList.innerHTML = '';
+    notes.sort((a, b) => b.updated - a.updated).forEach(note => {
+        const item = document.createElement('div');
+        item.className = 'note-item';
+        
+        const header = document.createElement('div');
+        header.className = 'note-item-header';
+        
+        const title = document.createElement('div');
+        title.className = 'note-item-title';
+        title.textContent = note.title || 'Untitled Note';
+        
+        const scope = document.createElement('span');
+        scope.className = 'note-item-scope';
+        scope.textContent = note.sessionID ? '📌 Session' : '🌐 Global';
+        
+        header.appendChild(title);
+        header.appendChild(scope);
+        
+        const content = document.createElement('div');
+        content.className = 'note-item-content';
+        const plainText = stripHtml(note.content);
+        content.textContent = plainText || 'Empty note';
+        
+        const footer = document.createElement('div');
+        footer.className = 'note-item-footer';
+        const date = document.createElement('span');
+        date.className = 'note-item-date';
+        date.textContent = formatNoteDate(note.updated);
+        footer.appendChild(date);
+        
+        item.appendChild(header);
+        item.appendChild(content);
+        item.appendChild(footer);
+        
+        item.addEventListener('click', () => openNote(note));
+        notesList.appendChild(item);
+    });
+}
+
+// Format note date
+function formatNoteDate(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+}
+
+// Strip HTML tags for preview
+function stripHtml(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+}
+
+// Open note for editing
+function openNote(note) {
+    currentNoteID = note.id;
+    
+    if (noteTitle) noteTitle.value = note.title || '';
+    if (noteEditor) noteEditor.innerHTML = note.content || '';
+    if (noteSessionScope) noteSessionScope.checked = !!note.sessionID;
+    
+    if (notesModal) {
+        notesModal.classList.add('active');
+        const modalTitle = document.getElementById('notesModalTitle');
+        if (modalTitle) modalTitle.textContent = '📝 Edit Note';
+        if (deleteNoteBtn) deleteNoteBtn.style.display = 'block';
+    }
+    
+    // Close favorites modal
+    if (favoritesModal) favoritesModal.classList.remove('active');
+}
+
+// Create new note
+function createNewNote() {
+    currentNoteID = null;
+    
+    if (noteTitle) noteTitle.value = '';
+    if (noteEditor) noteEditor.innerHTML = '';
+    if (noteSessionScope) noteSessionScope.checked = currentNotesScope === 'session';
+    
+    if (notesModal) {
+        notesModal.classList.add('active');
+        const modalTitle = document.getElementById('notesModalTitle');
+        if (modalTitle) modalTitle.textContent = '📝 New Note';
+        if (deleteNoteBtn) deleteNoteBtn.style.display = 'none';
+    }
+    
+    // Focus title input
+    if (noteTitle) noteTitle.focus();
+}
+
+// Save note
+async function saveNote() {
+    try {
+        const title = noteTitle?.value?.trim() || 'Untitled Note';
+        const content = noteEditor?.innerHTML || '';
+        const sessionID = noteSessionScope?.checked ? currentSession?.id : null;
+        
+        if (!content.trim()) {
+            showToast('Note content cannot be empty', 'error');
+            return;
+        }
+        
+        if (currentNoteID) {
+            // Update existing note
+            const response = await fetch(`/api/notes/${currentNoteID}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content })
+            });
+            
+            if (!response.ok) throw new Error('Failed to update note');
+            showToast('Note updated!', 'success');
+        } else {
+            // Create new note
+            const response = await fetch('/api/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content, sessionID })
+            });
+            
+            if (!response.ok) throw new Error('Failed to create note');
+            showToast('Note saved!', 'success');
+        }
+        
+        // Reload notes
+        await loadNotes('session');
+        await loadNotes('global');
+        
+        // Close modal
+        if (notesModal) notesModal.classList.remove('active');
+    } catch (error) {
+        console.error('Failed to save note:', error);
+        showToast('Failed to save note', 'error');
+    }
+}
+
+// Delete note
+async function deleteNote() {
+    if (!currentNoteID) return;
+    
+    if (!confirm('Are you sure you want to delete this note?')) return;
+    
+    try {
+        const response = await fetch(`/api/notes/${currentNoteID}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) throw new Error('Failed to delete note');
+        
+        showToast('Note deleted', 'success');
+        
+        // Reload notes
+        await loadNotes('session');
+        await loadNotes('global');
+        
+        // Close modal
+        if (notesModal) notesModal.classList.remove('active');
+    } catch (error) {
+        console.error('Failed to delete note:', error);
+        showToast('Failed to delete note', 'error');
+    }
+}
+
+// Send note as prompt
+async function sendNoteAsPrompt() {
+    const content = noteEditor?.innerHTML || '';
+    const plainText = stripHtml(content);
+    
+    if (!plainText.trim()) {
+        showToast('Note is empty', 'error');
+        return;
+    }
+    
+    // Close notes modal
+    if (notesModal) notesModal.classList.remove('active');
+    
+    // Set the content in the message input
+    if (editorMode === 'rich') {
+        if (richEditor) richEditor.innerHTML = content;
+    } else {
+        if (messageInput) messageInput.value = plainText;
+    }
+    
+    // Send the message
+    await sendMessage();
+}
+
+// Save current prompt to notes
+async function savePromptToNotes() {
+    const content = editorMode === 'rich' 
+        ? (richEditor?.innerHTML || '') 
+        : (messageInput?.value || '');
+    
+    if (!content.trim()) {
+        showToast('Nothing to save', 'error');
+        return;
+    }
+    
+    // Set the content in note editor
+    if (noteEditor) noteEditor.innerHTML = editorMode === 'rich' ? content : content;
+    if (noteTitle) noteTitle.value = '';
+    if (noteSessionScope) noteSessionScope.checked = true;
+    
+    currentNoteID = null;
+    
+    if (notesModal) {
+        notesModal.classList.add('active');
+        const modalTitle = document.getElementById('notesModalTitle');
+        if (modalTitle) modalTitle.textContent = '📝 Save to Notes';
+        if (deleteNoteBtn) deleteNoteBtn.style.display = 'none';
+    }
+    
+    // Focus title input
+    if (noteTitle) noteTitle.focus();
+}
+
+// Notes modal event listeners
+if (closeNotes) {
+    closeNotes.addEventListener('click', () => {
+        if (notesModal) notesModal.classList.remove('active');
+    });
+}
+
+if (newNoteBtn) {
+    newNoteBtn.addEventListener('click', createNewNote);
+}
+
+if (saveNoteBtn) {
+    saveNoteBtn.addEventListener('click', saveNote);
+}
+
+if (sendNoteBtn) {
+    sendNoteBtn.addEventListener('click', sendNoteAsPrompt);
+}
+
+if (deleteNoteBtn) {
+    deleteNoteBtn.addEventListener('click', deleteNote);
+}
+
+if (saveToNotesBtn) {
+    saveToNotesBtn.addEventListener('click', savePromptToNotes);
+}
+
+if (saveToNotesRichBtn) {
+    saveToNotesRichBtn.addEventListener('click', savePromptToNotes);
+}
+
+// Notes scope toggle
+document.querySelectorAll('.scope-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const scope = btn.dataset.scope;
+        if (scope && (scope === 'session' || scope === 'global')) {
+            currentNotesScope = scope;
+            document.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadNotes(scope);
+        }
+    });
+});
+
+// Favorites modal tabs
+document.querySelectorAll('[data-favorites-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tab = btn.dataset.favoritesTab;
+        
+        // Update tab buttons
+        document.querySelectorAll('[data-favorites-tab]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update tab content
+        document.querySelectorAll('.favorites-tab-content').forEach(content => {
+            content.classList.remove('active');
+            content.style.display = 'none';
+        });
+        
+        if (tab === 'favorites') {
+            const favTab = document.getElementById('favoritesTab');
+            if (favTab) {
+                favTab.classList.add('active');
+                favTab.style.display = 'block';
+            }
+        } else if (tab === 'notes') {
+            const notesTab = document.getElementById('notesListTab');
+            if (notesTab) {
+                notesTab.classList.add('active');
+                notesTab.style.display = 'block';
+            }
+            // Load notes when switching to notes tab
+            loadNotes(currentNotesScope);
+        }
+    });
+});
+
+// Markdown formatting for note editor
+if (noteEditor) {
+    const noteToolbar = document.getElementById('noteMarkdownToolbar');
+    if (noteToolbar) {
+        noteToolbar.querySelectorAll('.md-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const format = btn.dataset.format;
+                applyRichFormat(format, noteEditor);
+            });
+        });
+    }
 }
 
 async function init() {

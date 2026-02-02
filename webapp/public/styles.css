@@ -3033,3 +3033,255 @@ body.dark .typing-indicator-area {
 .messages-container.with-typing {
     /* No padding needed - typing area takes its own space */
 }
+
+/* Notes Feature Styles */
+
+/* Save to notes button in prompt area */
+.save-to-notes-btn {
+    position: absolute;
+    right: 40px;
+    bottom: 8px;
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    z-index: 10;
+}
+
+.save-to-notes-btn:hover {
+    opacity: 1;
+}
+
+body.dark .save-to-notes-btn {
+    opacity: 0.5;
+}
+
+body.dark .save-to-notes-btn:hover {
+    opacity: 0.9;
+}
+
+/* Notes list in favorites modal */
+.notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.notes-empty {
+    text-align: center;
+    color: #90949c;
+    padding: 40px 20px;
+    font-size: 14px;
+}
+
+.note-item {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.note-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.dark .note-item {
+    background: #2a2a2a;
+    border-color: #404040;
+}
+
+body.dark .note-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.note-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.note-item-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-color);
+}
+
+.note-item-scope {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #e4e6eb;
+    color: #666;
+}
+
+body.dark .note-item-scope {
+    background: #404040;
+    color: #aaa;
+}
+
+.note-item-content {
+    font-size: 13px;
+    color: #666;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.4;
+}
+
+body.dark .note-item-content {
+    color: #aaa;
+}
+
+.note-item-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #999;
+}
+
+.note-item-date {
+    font-size: 11px;
+    color: #999;
+}
+
+/* Notes scope toggle */
+.notes-scope-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-color);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.scope-btn {
+    background: transparent;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #666;
+}
+
+.scope-btn:hover {
+    background: rgba(0, 132, 255, 0.1);
+    color: var(--primary-color);
+}
+
+.scope-btn.active {
+    background: white;
+    color: var(--text-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+body.dark .notes-scope-toggle {
+    background: #1a1a1a;
+}
+
+body.dark .scope-btn.active {
+    background: #2a2a2a;
+    color: white;
+}
+
+/* Notes editor modal */
+#noteEditor {
+    min-height: 300px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+body.dark #noteEditor {
+    background: #2a2a2a;
+    border-color: #404040;
+    color: white;
+}
+
+#noteEditor:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+#noteEditor[placeholder]:empty:before {
+    content: attr(placeholder);
+    color: #999;
+}
+
+#noteTitle {
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: 6px;
+    width: 100%;
+}
+
+body.dark #noteTitle {
+    background: #2a2a2a;
+    border-color: #404040;
+    color: white;
+}
+
+.notes-scope-selector {
+    padding: 8px 12px;
+    background: var(--bg-color);
+    border-radius: 6px;
+}
+
+body.dark .notes-scope-selector {
+    background: #1a1a1a;
+}
+
+.notes-scope-selector input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+/* Favorites tabs */
+.favorites-tab-content {
+    display: none;
+}
+
+.favorites-tab-content.active {
+    display: block;
+}
+
+/* Notes header */
+.notes-header {
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 12px;
+}
+
+body.dark .notes-header {
+    border-bottom-color: #404040;
+}
+
+/* Note actions */
+.notes-actions {
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+body.dark .notes-actions {
+    border-top-color: #404040;
+}
