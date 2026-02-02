@@ -4,37 +4,44 @@ let ws = null;
 let currentQuestion = null;
 let agents = [];
 let models = [];
-let messageBuffer = new Map(); // Store streaming message parts
+let messageBuffer = new Map();
+
+// Helper to get element by ID with error checking
+const getEl = (id) => {
+    const el = document.getElementById(id);
+    if (!el) console.warn(`Element #${id} not found`);
+    return el;
+};
 
 // DOM elements
-const statusDot = document.getElementById('statusDot');
-const statusText = document.getElementById('statusText');
-const reconnectBtn = document.getElementById('reconnectBtn');
-const settingsBtn = document.getElementById('settingsBtn');
-const settingsModal = document.getElementById('settingsModal');
-const closeSettings = document.getElementById('closeSettings');
-const authModal = document.getElementById('authModal');
-const closeAuth = document.getElementById('closeAuth');
-const authErrorDetails = document.getElementById('authErrorDetails');
-const messageInput = document.getElementById('messageInput');
-const sendBtn = document.getElementById('sendBtn');
-const abortBtn = document.getElementById('abortBtn');
-const messagesContainer = document.getElementById('messagesContainer');
-const eventsContainer = document.getElementById('eventsContainer');
-const logsContainer = document.getElementById('logsContainer');
-const logCount = document.getElementById('logCount');
-const refreshLogsBtn = document.getElementById('refreshLogs');
-const agentSelect = document.getElementById('agentSelect');
-const modelSelect = document.getElementById('modelSelect');
-const secondaryModelSelect = document.getElementById('secondaryModelSelect');
-const directoryInput = document.getElementById('directoryInput');
-const createSessionBtn = document.getElementById('createSessionBtn');
-const sessionSearch = document.getElementById('sessionSearch');
-const qsAgentSelect = document.getElementById('qsAgentSelect');
-const qsModelSelect = document.getElementById('qsModelSelect');
-const sessionList = document.getElementById('sessionList');
-const hideReasoningCheckbox = document.getElementById('hideReasoning');
-const darkThemeCheckbox = document.getElementById('darkTheme');
+const statusDot = getEl('statusDot');
+const statusText = getEl('statusText');
+const reconnectBtn = getEl('reconnectBtn');
+const settingsBtn = getEl('settingsBtn');
+const settingsModal = getEl('settingsModal');
+const closeSettings = getEl('closeSettings');
+const authModal = getEl('authModal');
+const closeAuth = getEl('closeAuth');
+const authErrorDetails = getEl('authErrorDetails');
+const messageInput = getEl('messageInput');
+const sendBtn = getEl('sendBtn');
+const abortBtn = getEl('abortBtn');
+const messagesContainer = getEl('messagesContainer');
+const eventsContainer = getEl('eventsContainer');
+const logsContainer = getEl('logsContainer');
+const logCount = getEl('logCount');
+const refreshLogsBtn = getEl('refreshLogs');
+const agentSelect = getEl('agentSelect');
+const modelSelect = getEl('modelSelect');
+const secondaryModelSelect = getEl('secondaryModelSelect');
+const directoryInput = getEl('directoryInput');
+const createSessionBtn = getEl('createSessionBtn');
+const sessionSearch = getEl('sessionSearch');
+const qsAgentSelect = getEl('qsAgentSelect');
+const qsModelSelect = getEl('qsModelSelect');
+const sessionList = getEl('sessionList');
+const hideReasoningCheckbox = getEl('hideReasoning');
+const darkThemeCheckbox = getEl('darkTheme');
 
 // Tab switching (Main)
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -43,7 +50,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
-        document.getElementById(tab + 'Tab').classList.add('active');
+        const target = getEl(tab + 'Tab');
+        if (target) target.classList.add('active');
     });
 });
 
@@ -54,9 +62,9 @@ document.querySelectorAll('.settings-tab-btn').forEach(btn => {
         document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
-        // Match the ID in HTML: existingSessionsTab or newSessionTab
         const targetId = tab === 'existing' ? 'existingSessionsTab' : 'newSessionTab';
-        document.getElementById(targetId).classList.add('active');
+        const target = getEl(targetId);
+        if (target) target.classList.add('active');
         if (tab === 'existing') loadExistingSessions();
     });
 });
@@ -73,42 +81,53 @@ if (sessionSearch) {
 }
 
 // Modal controls
-settingsBtn.addEventListener('click', () => {
-    settingsModal.classList.add('active');
-    loadExistingSessions();
-});
+if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+        settingsModal.classList.add('active');
+        loadExistingSessions();
+    });
+}
 
-closeSettings.addEventListener('click', () => {
-    settingsModal.classList.remove('active');
-});
+if (closeSettings) {
+    closeSettings.addEventListener('click', () => {
+        settingsModal.classList.remove('active');
+    });
+}
 
-closeAuth.addEventListener('click', () => {
-    authModal.classList.remove('active');
-});
+if (closeAuth) {
+    closeAuth.addEventListener('click', () => {
+        authModal.classList.remove('active');
+    });
+}
 
 function showAuthError(message) {
-    authErrorDetails.textContent = typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
-    authModal.classList.add('active');
+    if (authErrorDetails) authErrorDetails.textContent = typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
+    if (authModal) authModal.classList.add('active');
     updateStatus('error', 'Authentication Failed');
 }
 
 // Auto-resize textarea
-messageInput.addEventListener('input', () => {
-    messageInput.style.height = 'auto';
-    messageInput.style.height = messageInput.scrollHeight + 'px';
-    sendBtn.disabled = !messageInput.value.trim();
-});
+if (messageInput) {
+    messageInput.addEventListener('input', () => {
+        messageInput.style.height = 'auto';
+        messageInput.style.height = messageInput.scrollHeight + 'px';
+        if (sendBtn) sendBtn.disabled = !messageInput.value.trim();
+    });
+}
 
 // Send message
-sendBtn.addEventListener('click', sendMessage);
-abortBtn.addEventListener('click', abortLastPrompt);
-refreshLogsBtn.addEventListener('click', fetchLogs);
-messageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
+if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+if (abortBtn) abortBtn.addEventListener('click', abortLastPrompt);
+if (refreshLogsBtn) refreshLogsBtn.addEventListener('click', fetchLogs);
+
+if (messageInput) {
+    messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+}
 
 // Cookie helpers
 function setCookie(name, value, days = 30) {
@@ -130,41 +149,49 @@ function getCookie(name) {
 }
 
 // Preference Toggles
-darkThemeCheckbox.addEventListener('change', (e) => {
-    document.body.classList.toggle('dark', e.target.checked);
-    setCookie('darkTheme', e.target.checked ? 'true' : 'false');
-});
+if (darkThemeCheckbox) {
+    darkThemeCheckbox.addEventListener('change', (e) => {
+        document.body.classList.toggle('dark', e.target.checked);
+        setCookie('darkTheme', e.target.checked ? 'true' : 'false');
+    });
+}
 
-hideReasoningCheckbox.addEventListener('change', (e) => {
-    document.body.classList.toggle('hide-reasoning', e.target.checked);
-    setCookie('hideReasoning', e.target.checked ? 'true' : 'false');
-});
+if (hideReasoningCheckbox) {
+    hideReasoningCheckbox.addEventListener('change', (e) => {
+        document.body.classList.toggle('hide-reasoning', e.target.checked);
+        setCookie('hideReasoning', e.target.checked ? 'true' : 'false');
+    });
+}
 
-qsAgentSelect.addEventListener('change', (e) => {
-    agentSelect.value = e.target.value;
-    setCookie('favAgent', e.target.value);
-});
+if (qsAgentSelect) {
+    qsAgentSelect.addEventListener('change', (e) => {
+        if (agentSelect) agentSelect.value = e.target.value;
+        setCookie('favAgent', e.target.value);
+    });
+}
 
-qsModelSelect.addEventListener('change', (e) => {
-    modelSelect.value = e.target.value;
-    setCookie('favModel', e.target.value);
-});
+if (qsModelSelect) {
+    qsModelSelect.addEventListener('change', (e) => {
+        if (modelSelect) modelSelect.value = e.target.value;
+        setCookie('favModel', e.target.value);
+    });
+}
 
 function applyStoredPreferences() {
     if (getCookie('darkTheme') === 'true') {
         document.body.classList.add('dark');
-        darkThemeCheckbox.checked = true;
+        if (darkThemeCheckbox) darkThemeCheckbox.checked = true;
     }
     if (getCookie('hideReasoning') === 'true') {
         document.body.classList.add('hide-reasoning');
-        hideReasoningCheckbox.checked = true;
+        if (hideReasoningCheckbox) hideReasoningCheckbox.checked = true;
     }
 }
 
 async function sendMessage() {
     if (!currentSession) {
         alert('Please connect to a session first');
-        settingsModal.classList.add('active');
+        if (settingsModal) settingsModal.classList.add('active');
         return;
     }
     
@@ -173,11 +200,11 @@ async function sendMessage() {
 
     messageInput.value = '';
     messageInput.style.height = 'auto';
-    sendBtn.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
     
-    const agent = qsAgentSelect.value || undefined;
-    const modelStr = qsModelSelect.value;
-    const model = modelStr ? JSON.parse(modelStr) : undefined;
+    const agent = qsAgentSelect ? qsAgentSelect.value : undefined;
+    const modelStr = qsModelSelect ? qsModelSelect.value : undefined;
+    const model = (modelStr && modelStr !== "") ? JSON.parse(modelStr) : undefined;
 
     addMessage('user', text, false, false, false, false, { agent, modelID: model?.modelID, providerID: model?.providerID });
     addTypingIndicator('assistant-typing');
@@ -204,7 +231,7 @@ async function sendMessage() {
         addEvent('Error', 'Failed to send message: ' + error.message);
         alert('Failed to send message: ' + error.message);
     } finally {
-        sendBtn.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
     }
 }
 
@@ -228,12 +255,16 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
         const content = document.createElement('div');
         content.className = 'message-content';
         streamMsg.appendChild(content);
-        messagesContainer.appendChild(streamMsg);
+        if (messagesContainer) messagesContainer.appendChild(streamMsg);
     }
     
     const content = streamMsg.querySelector('.message-content') || streamMsg;
-    content.innerHTML = marked.parse(text);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (typeof marked !== 'undefined') {
+        content.innerHTML = marked.parse(text);
+    } else {
+        content.textContent = text;
+    }
+    if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 function removeStreamingMessage(messageID) {
@@ -245,7 +276,7 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     if (!text) return;
 
     const msgID = metadata ? (metadata.id || metadata.messageID) : null;
-    if (msgID && document.getElementById('msg-' + msgID)) return; // Avoid duplicates
+    if (msgID && document.getElementById('msg-' + msgID)) return;
 
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${role}`;
@@ -407,35 +438,38 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     if (isWarning) bubble.classList.add('warning');
     if (isInfo) bubble.classList.add('info-blue');
     
-    messagesContainer.appendChild(bubble);
-    const time = document.createElement('div');
-    time.className = 'message-time';
-    time.textContent = new Date().toLocaleTimeString();
-    messagesContainer.appendChild(time);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (messagesContainer) {
+        messagesContainer.appendChild(bubble);
+        const time = document.createElement('div');
+        time.className = 'message-time';
+        time.textContent = new Date().toLocaleTimeString();
+        messagesContainer.appendChild(time);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
 }
 
 async function abortLastPrompt() {
     if (!currentSession) return;
     try {
-        abortBtn.disabled = true;
+        if (abortBtn) abortBtn.disabled = true;
         const response = await fetch(`/api/session/${currentSession.id}/abort`, { method: 'POST' });
         if (!response.ok) throw new Error('Abort failed');
         addMessage('assistant', '🛑 Prompt aborted by user.', false, false, true);
     } catch (error) {
         addEvent('Error', 'Failed to abort: ' + error.message);
     } finally {
-        abortBtn.disabled = false;
+        if (abortBtn) abortBtn.disabled = false;
     }
 }
 
 function updateStatus(status, text) {
-    statusDot.className = 'status-dot ' + status;
-    statusText.textContent = text || status.charAt(0).toUpperCase() + status.slice(1);
-    abortBtn.style.display = (status === 'busy' || status === 'retry') ? 'flex' : 'none';
+    if (statusDot) statusDot.className = 'status-dot ' + status;
+    if (statusText) statusText.textContent = text || status.charAt(0).toUpperCase() + status.slice(1);
+    if (abortBtn) abortBtn.style.display = (status === 'busy' || status === 'retry') ? 'flex' : 'none';
 }
 
 function addEvent(type, data) {
+    if (!eventsContainer) return;
     const item = document.createElement('div');
     item.className = 'event-item';
     item.innerHTML = `<div class="event-header">${type}</div><div class="event-body">${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</div><div class="event-time">${new Date().toLocaleTimeString()}</div>`;
@@ -443,7 +477,7 @@ function addEvent(type, data) {
 }
 
 function addTypingIndicator(id) {
-    if (document.getElementById(id)) return;
+    if (!messagesContainer || document.getElementById(id)) return;
     const indicator = document.createElement('div');
     indicator.id = id;
     indicator.className = 'typing-indicator';
@@ -465,14 +499,16 @@ function updateSubagentProgress(data) {
         progressEl = document.createElement('div');
         progressEl.id = progressID;
         progressEl.className = 'subagent-pill';
-        let target = document.getElementById('stream-' + messageID) || messagesContainer.lastElementChild;
+        let target = document.getElementById('stream-' + messageID) || (messagesContainer ? messagesContainer.lastElementChild : null);
         if (target) target.after(progressEl);
-        else messagesContainer.appendChild(progressEl);
+        else if (messagesContainer) messagesContainer.appendChild(progressEl);
     }
-    const icon = status === 'running' ? '⏳' : status === 'completed' ? '✅' : status === 'error' ? '❌' : '⚪';
-    progressEl.innerHTML = `<span class="pill-icon ${status === 'running' ? 'spinning' : ''}">${icon}</span> <span class="pill-agent">${agent}</span>: <span class="pill-task">${task}</span>`;
-    progressEl.className = `subagent-pill ${status}`;
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (progressEl) {
+        const icon = status === 'running' ? '⏳' : status === 'completed' ? '✅' : status === 'error' ? '❌' : '⚪';
+        progressEl.innerHTML = `<span class="pill-icon ${status === 'running' ? 'spinning' : ''}">${icon}</span> <span class="pill-agent">${agent}</span>: <span class="pill-task">${task}</span>`;
+        progressEl.className = `subagent-pill ${status}`;
+        if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
 }
 
 function connectWebSocket() {
@@ -481,7 +517,7 @@ function connectWebSocket() {
     
     ws.onopen = () => {
         addEvent('System', 'WebSocket connected');
-        reconnectBtn.style.display = 'none';
+        if (reconnectBtn) reconnectBtn.style.display = 'none';
         if (currentSession) {
             ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
             syncSessionState(currentSession.id);
@@ -524,7 +560,7 @@ function connectWebSocket() {
                 break;
             case 'session.model_switched':
                 addMessage('assistant', `🔄 **Model Switched**: Now using **${data.model?.modelID}**`, false, false, false, true);
-                if (data.model) {
+                if (data.model && qsModelSelect && modelSelect) {
                     const val = JSON.stringify({ providerID: data.model.providerID, modelID: data.model.modelID });
                     qsModelSelect.value = val; modelSelect.value = val;
                 }
@@ -537,7 +573,7 @@ function connectWebSocket() {
     
     ws.onclose = () => {
         updateStatus('error', 'Disconnected');
-        reconnectBtn.style.display = 'inline-block';
+        if (reconnectBtn) reconnectBtn.style.display = 'inline-block';
     };
 }
 
@@ -556,12 +592,19 @@ async function syncSessionState(sessionID) {
     } catch (err) { console.error('Sync failed:', err); }
 }
 
-reconnectBtn.addEventListener('click', () => {
-    reconnectBtn.disabled = true;
-    reconnectBtn.textContent = 'Connecting...';
-    connectWebSocket();
-    setTimeout(() => { reconnectBtn.disabled = false; reconnectBtn.textContent = 'Reconnect'; }, 2000);
-});
+if (reconnectBtn) {
+    reconnectBtn.addEventListener('click', () => {
+        reconnectBtn.disabled = true;
+        reconnectBtn.textContent = 'Connecting...';
+        connectWebSocket();
+        setTimeout(() => { 
+            if (reconnectBtn) {
+                reconnectBtn.disabled = false; 
+                reconnectBtn.textContent = 'Reconnect'; 
+            }
+        }, 2000);
+    });
+}
 
 async function loadAgentsAndModels() {
     try {
@@ -569,6 +612,7 @@ async function loadAgentsAndModels() {
         agents = await agentsRes.json();
         models = await modelsRes.json();
         const populateSelect = (select, items, label, isModel = false) => {
+            if (!select) return;
             select.innerHTML = `<option value="">${label}</option>`;
             if (isModel) {
                 const groups = {};
@@ -592,35 +636,40 @@ async function loadAgentsAndModels() {
         populateSelect(qsModelSelect, models, 'Model: Default', true);
         populateSelect(secondaryModelSelect, models, 'None', true);
         const favA = getCookie('favAgent'), favM = getCookie('favModel');
-        if (favA) { agentSelect.value = favA; qsAgentSelect.value = favA; }
-        if (favM) { modelSelect.value = favM; qsModelSelect.value = favM; }
+        if (favA && agentSelect && qsAgentSelect) { agentSelect.value = favA; qsAgentSelect.value = favA; }
+        if (favM && modelSelect && qsModelSelect) { modelSelect.value = favM; qsModelSelect.value = favM; }
     } catch (e) { addEvent('Error', 'Failed to load config'); }
 }
 
-createSessionBtn.addEventListener('click', async () => {
-    const agent = agentSelect.value || undefined, modelStr = modelSelect.value;
-    const model = modelStr ? JSON.parse(modelStr) : undefined;
-    const secondaryModelStr = secondaryModelSelect.value;
-    const secondaryModel = secondaryModelStr ? JSON.parse(secondaryModelStr) : undefined;
-    const directory = directoryInput.value || '/root';
-    try {
-        updateStatus('busy', 'Creating session...');
-        const res = await fetch('/api/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent, model, secondaryModel, directory })
-        });
-        if (!res.ok) throw new Error('Create failed');
-        currentSession = await res.json();
-        if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
-        updateStatus('idle'); settingsModal.classList.remove('active');
-        messagesContainer.innerHTML = '';
-        addMessage('assistant', 'Session created!');
-        loadSessionHistory(currentSession.id);
-    } catch (e) { updateStatus('error', 'Failed'); }
-});
+if (createSessionBtn) {
+    createSessionBtn.addEventListener('click', async () => {
+        const agent = agentSelect ? agentSelect.value : undefined;
+        const modelStr = modelSelect ? modelSelect.value : undefined;
+        const model = (modelStr && modelStr !== "") ? JSON.parse(modelStr) : undefined;
+        const secondaryModelStr = secondaryModelSelect ? secondaryModelSelect.value : undefined;
+        const secondaryModel = (secondaryModelStr && secondaryModelStr !== "") ? JSON.parse(secondaryModelStr) : undefined;
+        const directory = directoryInput ? directoryInput.value : '/root';
+        try {
+            updateStatus('busy', 'Creating session...');
+            const res = await fetch('/api/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ agent, model, secondaryModel, directory })
+            });
+            if (!res.ok) throw new Error('Create failed');
+            currentSession = await res.json();
+            if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
+            updateStatus('idle'); 
+            if (settingsModal) settingsModal.classList.remove('active');
+            if (messagesContainer) messagesContainer.innerHTML = '';
+            addMessage('assistant', 'Session created!');
+            loadSessionHistory(currentSession.id);
+        } catch (e) { updateStatus('error', 'Failed'); }
+    });
+}
 
 async function loadExistingSessions(search = '') {
+    if (!sessionList) return;
     try {
         sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: #90949c;">Loading...</div>';
         const start = Date.now() - (7 * 24 * 60 * 60 * 1000);
@@ -650,8 +699,9 @@ async function connectToSession(session) {
     try {
         const messages = await fetch(`/api/session/${session.id}/messages?limit=20`).then(r => r.json());
         if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
-        updateStatus('idle'); settingsModal.classList.remove('active');
-        messagesContainer.innerHTML = '';
+        updateStatus('idle'); 
+        if (settingsModal) settingsModal.classList.remove('active');
+        if (messagesContainer) messagesContainer.innerHTML = '';
         messages.forEach(msg => {
             const text = msg.parts.filter(p => p.type === 'text').map(p => p.text).join('\n');
             if (text) addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info);
@@ -669,13 +719,39 @@ async function loadSessionHistory(id) {
     } catch (e) {}
 }
 
+async function fetchLogs() {
+    if (!logsContainer) return;
+    try {
+        const url = currentSession ? `/api/logs?sessionID=${currentSession.id}` : '/api/logs';
+        const response = await fetch(url);
+        const logs = await response.json();
+        if (logCount) logCount.textContent = `${logs.length} events`;
+        logsContainer.innerHTML = '';
+        if (logs.length === 0) { logsContainer.innerHTML = '<div class="log-item">No events found.</div>'; return; }
+        logs.reverse().forEach(log => {
+            const item = document.createElement('div');
+            item.style.marginBottom = '8px'; item.style.padding = '8px';
+            item.style.background = 'var(--bg-light)'; item.style.borderRadius = '4px';
+            item.style.borderLeft = '3px solid #ccc';
+            const time = new Date(log.timestamp).toLocaleTimeString() + '.' + (log.timestamp % 1000);
+            item.innerHTML = `<div style="font-weight: bold; color: var(--primary-color); margin-bottom: 4px;">[${time}] ${log.payload.type}</div><pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">${JSON.stringify(log.payload.properties, null, 2)}</pre>`;
+            logsContainer.appendChild(item);
+        });
+    } catch (e) {}
+}
+
 async function init() {
     applyStoredPreferences();
     try {
         connectWebSocket();
         await loadAgentsAndModels();
-        setTimeout(() => { if (!currentSession) { settingsModal.classList.add('active'); loadExistingSessions(); } }, 500);
-    } catch (e) {}
+        setTimeout(() => { 
+            if (!currentSession && settingsModal) { 
+                settingsModal.classList.add('active'); 
+                loadExistingSessions(); 
+            } 
+        }, 500);
+    } catch (e) { console.error('Init failed:', e); }
 }
 
 init();
