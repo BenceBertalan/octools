@@ -265,7 +265,6 @@ body {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    flex: 1;
     overflow: hidden;
     position: relative; /* Contain content properly */
 }
