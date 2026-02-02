@@ -2862,46 +2862,43 @@ async function connectToSession(session) {
     if (messagesContainer) messagesContainer.innerHTML = '';
     
     try {
-        // Fetch all messages without limit
-        if (loadingText) loadingText.textContent = 'Fetching messages...';
+        // STAGE 1: Fetch recent messages quickly (up to 200)
+        if (loadingText) loadingText.textContent = 'Fetching recent messages...';
         if (progressFill) progressFill.style.width = '10%';
         
-        const response = await fetch(`/api/session/${session.id}/messages`);
-        if (!response.ok) throw new Error('Failed to fetch messages');
-        const allMessages = await safeJson(response) || [];
+        const initialResponse = await fetch(`/api/session/${session.id}/messages?limit=200`);
+        if (!initialResponse.ok) throw new Error('Failed to fetch messages');
+        const recentMessages = await safeJson(initialResponse) || [];
         
-        // Update progress: fetched all messages
-        if (loadingText) loadingText.textContent = `Fetched ${allMessages.length} messages`;
-        if (loadingStats) loadingStats.textContent = `${allMessages.length} messages fetched`;
-        if (progressFill) progressFill.style.width = '30%';
+        console.log(`[UI] Fetched ${recentMessages.length} recent messages`);
         
-        // Cache messages
-        messagesCache.set(session.id, allMessages);
+        // Filter to last 12 hours
+        const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000);
+        let messagesToShow = recentMessages.filter(msg => {
+            const msgTime = new Date(msg.info.time).getTime();
+            return msgTime >= twelveHoursAgo;
+        });
         
-        // Determine how many to show initially (last 20)
-        const initialCount = Math.min(20, allMessages.length);
-        const startIndex = allMessages.length - initialCount;
-        const messagesToShow = allMessages.slice(startIndex);
+        // If filtered messages exceed 200 or we got exactly 200, use all 200
+        if (messagesToShow.length > 200 || recentMessages.length === 200) {
+            messagesToShow = recentMessages;
+        }
         
-        // Store oldest displayed index
-        oldestDisplayedIndex.set(session.id, startIndex);
+        console.log(`[UI] Showing ${messagesToShow.length} messages from last 12h`);
         
-        // Update progress: processing messages
-        if (loadingText) loadingText.textContent = 'Processing messages...';
-        if (progressFill) progressFill.style.width = '50%';
+        // Update progress: fetched initial messages
+        if (loadingText) loadingText.textContent = `Showing ${messagesToShow.length} recent messages`;
+        if (loadingStats) loadingStats.textContent = `${messagesToShow.length} messages`;
+        if (progressFill) progressFill.style.width = '40%';
         
+        // Subscribe to WebSocket updates
         if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
         updateStatus('idle'); 
         if (settingsModal) settingsModal.classList.remove('active');
         
-        // Add "Load More" button if there are more messages
-        if (startIndex > 0) {
-            updateLoadMoreButton(false, true);
-        }
-        
         // Update progress: rendering messages
         if (loadingText) loadingText.textContent = 'Rendering messages...';
-        if (progressFill) progressFill.style.width = '60%';
+        if (progressFill) progressFill.style.width = '50%';
         
         // Render messages with progress updates
         let processedCount = 0;
@@ -2932,19 +2929,48 @@ async function connectToSession(session) {
             }
             
             processedCount++;
-            if (loadingStats) loadingStats.textContent = `Loading ${processedCount} / ${messagesToShow.length}`;
+            if (loadingStats) loadingStats.textContent = `Rendered ${processedCount} / ${messagesToShow.length}`;
             
-            // Update progress during rendering
-            const renderProgress = 60 + (processedCount / messagesToShow.length) * 40;
+            // Update progress during rendering (50-90%)
+            const renderProgress = 50 + (processedCount / messagesToShow.length) * 40;
             if (progressFill) progressFill.style.width = `${renderProgress}%`;
         }
         
-        // Complete - hide loading modal
+        // Complete initial load - hide loading modal
         if (loadingText) loadingText.textContent = 'Complete!';
         if (progressFill) progressFill.style.width = '100%';
         setTimeout(() => {
             if (loadingModal) loadingModal.style.display = 'none';
-        }, 500);
+        }, 300);
+        
+        // STAGE 2: Fetch ALL messages in background and cache them
+        console.log('[UI] Starting background fetch of all messages...');
+        fetch(`/api/session/${session.id}/messages`)
+            .then(async (response) => {
+                if (!response.ok) throw new Error('Failed to fetch all messages');
+                const allMessages = await safeJson(response) || [];
+                console.log(`[UI] Background fetch complete: ${allMessages.length} total messages cached`);
+                
+                // Cache all messages
+                messagesCache.set(session.id, allMessages);
+                
+                // Calculate how many messages are already displayed
+                const displayedCount = messagesToShow.length;
+                const startIndex = allMessages.length - displayedCount;
+                
+                // Store oldest displayed index
+                oldestDisplayedIndex.set(session.id, startIndex);
+                
+                // Add "Load More" button if there are older messages
+                if (startIndex > 0) {
+                    console.log(`[UI] ${startIndex} older messages available`);
+                    updateLoadMoreButton(false, true);
+                }
+            })
+            .catch(e => {
+                console.error('[UI] Background fetch failed:', e);
+                addEvent('Warning', 'Failed to load full message history: ' + e.message);
+            });
         
     } catch (e) { 
         addEvent('Error', 'Connect failed: ' + e.message);
