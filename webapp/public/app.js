@@ -167,7 +167,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // Add swipe gesture support for tab switching
-const tabOrder = ['chat', 'tools'];
+const tabOrder = ['chat', 'files', 'tools'];
 let touchStartX = 0;
 let touchStartY = 0;
 let touchEndX = 0;
@@ -1358,6 +1358,8 @@ const diffBtn = document.getElementById('diffBtn');
 const diffDrawerClose = document.getElementById('diffDrawerClose');
 const diffDrawerOverlay = document.getElementById('diffDrawerOverlay');
 const clearDiffBtn = document.getElementById('clearDiffBtn');
+const loadPastChangesBtn = document.getElementById('loadPastChangesBtn');
+const clearFilesBtn = document.getElementById('clearFilesBtn');
 
 if (diffBtn) {
     diffBtn.addEventListener('click', toggleDiffDrawer);
@@ -1370,6 +1372,18 @@ if (diffDrawerOverlay) {
 }
 if (clearDiffBtn) {
     clearDiffBtn.addEventListener('click', () => {
+        if (confirm('Clear all file changes for this session?')) {
+            clearSessionDiffs();
+        }
+    });
+}
+
+// Files tab event listeners
+if (loadPastChangesBtn) {
+    loadPastChangesBtn.addEventListener('click', loadPastChanges);
+}
+if (clearFilesBtn) {
+    clearFilesBtn.addEventListener('click', () => {
         if (confirm('Clear all file changes for this session?')) {
             clearSessionDiffs();
         }
@@ -2727,60 +2741,61 @@ function handleSessionDiff(data) {
     
     // Update UI if this is the current session
     if (sessionID === currentSessionID) {
-        updateDiffButton(existingDiffs.length);
-        if (isDiffDrawerOpen()) {
-            renderDiffDrawer(existingDiffs);
+        updateFilesBadge(existingDiffs.length);
+        if (isFilesTabActive()) {
+            renderFilesTab(existingDiffs);
         }
     }
 }
 
-function updateDiffButton(count) {
-    const diffBtn = document.getElementById('diffBtn');
-    const diffBadge = document.getElementById('diffBadge');
-    const diffBtnText = document.getElementById('diffBtnText');
+function updateFilesBadge(count) {
+    const filesBadge = document.getElementById('filesBadge');
+    const filesCount = document.getElementById('filesCount');
     
-    if (count > 0) {
-        diffBtn.style.display = 'inline-flex';
-        diffBadge.textContent = count;
-        diffBadge.style.display = 'inline';
-        diffBtnText.textContent = `📄 Files (${count})`;
-    } else {
-        diffBtn.style.display = 'none';
+    if (filesBadge) {
+        filesBadge.textContent = count;
+        filesBadge.style.display = count > 0 ? 'inline' : 'none';
+    }
+    
+    if (filesCount) {
+        filesCount.textContent = count;
     }
 }
 
-function isDiffDrawerOpen() {
-    const drawer = document.getElementById('diffDrawer');
-    return drawer && drawer.classList.contains('open');
+function isFilesTabActive() {
+    const filesTab = document.getElementById('filesTab');
+    return filesTab && filesTab.classList.contains('active');
 }
 
-function toggleDiffDrawer() {
-    const drawer = document.getElementById('diffDrawer');
-    const overlay = document.getElementById('diffDrawerOverlay');
-    if (!drawer || !overlay) return;
+function renderFilesTab(diffs) {
+    const content = document.getElementById('filesContent');
+    const filesCount = document.getElementById('filesCount');
+    const filesStats = document.getElementById('filesStats');
     
-    const isOpen = drawer.classList.contains('open');
+    if (!content) return;
     
-    if (isOpen) {
-        drawer.classList.remove('open');
-        overlay.classList.remove('visible');
-    } else {
-        drawer.classList.add('open');
-        overlay.classList.add('visible');
-        const diffs = sessionDiffs.get(currentSessionID) || [];
-        renderDiffDrawer(diffs);
+    if (filesCount) {
+        filesCount.textContent = diffs.length;
     }
-}
-
-function renderDiffDrawer(diffs) {
-    const content = document.getElementById('diffDrawerContent');
-    const title = document.getElementById('diffDrawerTitle');
-    if (!content || !title) return;
     
-    title.textContent = `Files Changed (${diffs.length})`;
+    // Update stats
+    if (filesStats && diffs.length > 0) {
+        const totalAdditions = diffs.reduce((sum, d) => sum + d.additions, 0);
+        const totalDeletions = diffs.reduce((sum, d) => sum + d.deletions, 0);
+        filesStats.textContent = `+${totalAdditions}/-${totalDeletions} lines`;
+    } else if (filesStats) {
+        filesStats.textContent = 'No changes yet';
+    }
     
     if (diffs.length === 0) {
-        content.innerHTML = '<div class="diff-empty-state">No file changes yet</div>';
+        content.innerHTML = `
+            <div class="files-empty-state">
+                <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
+                <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No File Changes Yet</div>
+                <div style="font-size: 13px; color: #666; margin-bottom: 24px;">File changes will appear here as you work</div>
+                <button class="btn-primary" id="emptyStateLoadBtn" onclick="loadPastChanges()">Load Past Changes</button>
+            </div>
+        `;
         return;
     }
     
@@ -2823,7 +2838,7 @@ function toggleFileDiff(filename) {
     }
     
     const diffs = sessionDiffs.get(currentSessionID) || [];
-    renderDiffDrawer(diffs);
+    renderFilesTab(diffs);
 }
 
 async function loadFileDiff(diff) {
@@ -2878,8 +2893,73 @@ function clearSessionDiffs() {
     
     sessionDiffs.delete(currentSessionID);
     expandedDiffs.clear();
-    updateDiffButton(0);
-    renderDiffDrawer([]);
+    updateFilesBadge(0);
+    renderFilesTab([]);
+}
+
+async function loadPastChanges() {
+    if (!currentSessionID) {
+        showToast('No session selected', 'error');
+        return;
+    }
+    
+    const loadBtn = document.getElementById('loadPastChangesBtn');
+    const emptyBtn = document.getElementById('emptyStateLoadBtn');
+    
+    // Disable buttons and show loading state
+    const originalText = loadBtn ? loadBtn.textContent : '';
+    if (loadBtn) {
+        loadBtn.disabled = true;
+        loadBtn.textContent = 'Loading...';
+    }
+    if (emptyBtn) {
+        emptyBtn.disabled = true;
+        emptyBtn.textContent = 'Loading...';
+    }
+    
+    try {
+        // Fetch diffs from API
+        const response = await fetch(`/api/session/${currentSessionID}/diff`);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to load diffs: ${response.statusText}`);
+        }
+        
+        const diffs = await response.json();
+        
+        if (!Array.isArray(diffs)) {
+            throw new Error('Invalid diff response format');
+        }
+        
+        // Store diffs
+        sessionDiffs.set(currentSessionID, diffs);
+        
+        // Update UI
+        updateFilesBadge(diffs.length);
+        renderFilesTab(diffs);
+        
+        // Show success message
+        if (diffs.length === 0) {
+            showToast('No file changes found', 'info');
+        } else {
+            showToast(`Loaded ${diffs.length} file change(s)`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('Failed to load past changes:', error);
+        showToast(`Failed to load changes: ${error.message}`, 'error');
+        
+    } finally {
+        // Re-enable buttons
+        if (loadBtn) {
+            loadBtn.disabled = false;
+            loadBtn.textContent = originalText;
+        }
+        if (emptyBtn) {
+            emptyBtn.disabled = false;
+            emptyBtn.textContent = 'Load Past Changes';
+        }
+    }
 }
 
 async function sendMessage(customText = null, customAgent = null, customModel = null) {

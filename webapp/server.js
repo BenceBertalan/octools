@@ -325,6 +325,32 @@ app.post('/api/session/:sessionID/message', async (req, res) => {
   }
 });
 
+// Get all diffs for a session (for Files tab)
+app.get('/api/session/:sessionID/diff', async (req, res) => {
+  try {
+    const { sessionID } = req.params;
+    
+    // Call OpenCode API to get all diffs
+    const response = await fetch(`${OPENCODE_URL}/session/${sessionID}/diff`);
+    
+    if (!response.ok) {
+      throw new Error(`OpenCode API error: ${response.statusText}`);
+    }
+    
+    const diffs = await response.json();
+    
+    // Return array of FileDiff objects
+    res.json(diffs || []);
+    
+  } catch (error) {
+    console.error('Error fetching session diffs:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch session diffs',
+      details: error.message 
+    });
+  }
+});
+
 app.get('/api/session/:sessionID/diff/:file', async (req, res) => {
   try {
     const { sessionID, file } = req.params;
