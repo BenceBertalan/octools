@@ -734,6 +734,7 @@ function connectWebSocket() {
     
     ws.onopen = () => {
         addEvent('System', 'WebSocket connected');
+        updateStatus('idle', 'Connected');
         if (reconnectBtn) reconnectBtn.style.display = 'none';
         if (currentSession) {
             ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
@@ -1021,5 +1022,16 @@ async function init() {
         addEvent('Error', 'Initialization error: ' + e.message);
     }
 }
+
+// Auto-reconnect when page becomes visible
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        // Check if websocket is disconnected
+        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+            console.log('[System] Page visible and WebSocket disconnected, reconnecting...');
+            connectWebSocket();
+        }
+    }
+});
 
 init();
