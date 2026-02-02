@@ -816,6 +816,12 @@ function handleSessionError(data) {
     const errorMessage = error.message || 'An unknown error occurred';
     const errorDetails = error.details || error.stack;
     
+    // Hide liveness timer on error
+    const livenessContainer = document.getElementById('livenessContainer');
+    if (livenessContainer) {
+        livenessContainer.style.display = 'none';
+    }
+    
     // Build error message
     let displayMessage = `❌ **${errorName}**: ${errorMessage}`;
     
@@ -840,56 +846,67 @@ function handleSessionError(data) {
 function handleSessionLiveness(data) {
     const { sessionID, secondsSinceLastEvent, isStale } = data;
     
-    // Update or create timer display for the active message
-    const messages = messagesDiv.querySelectorAll('.message-bubble');
-    const lastMessage = messages[messages.length - 1];
-    
-    if (lastMessage) {
-        // Find or create timer badge
-        let timerBadge = lastMessage.querySelector('.liveness-timer');
-        if (!timerBadge) {
-            timerBadge = document.createElement('span');
-            timerBadge.className = 'liveness-timer';
-            timerBadge.style.cssText = `
-                display: inline-block;
-                margin-left: 8px;
-                padding: 3px 6px;
-                border-radius: 10px;
-                font-size: 11px;
-                font-weight: 600;
-                background: #28a745;
-                color: white;
-                vertical-align: middle;
-            `;
-            
-            // Add to message info bar if it exists, otherwise create a header
-            let targetElement = lastMessage.querySelector('.message-info-bar');
-            if (!targetElement) {
-                targetElement = document.createElement('div');
-                targetElement.className = 'message-info-bar';
-                targetElement.style.cssText = 'margin-bottom: 8px; font-size: 14px; color: #333;';
-                lastMessage.insertBefore(targetElement, lastMessage.firstChild);
-            }
-            targetElement.appendChild(timerBadge);
+    // Find or create timer display below the status indicator
+    let livenessContainer = document.getElementById('livenessContainer');
+    if (!livenessContainer) {
+        // Create container below status info
+        livenessContainer = document.createElement('div');
+        livenessContainer.id = 'livenessContainer';
+        livenessContainer.style.cssText = `
+            margin-top: 8px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        `;
+        
+        // Insert after the status-info div
+        const statusInfo = document.querySelector('.status-info');
+        if (statusInfo && statusInfo.parentNode) {
+            statusInfo.parentNode.insertBefore(livenessContainer, statusInfo.nextSibling);
         }
-        
-        // Update timer text and color based on time
-        timerBadge.textContent = `⏱ ${secondsSinceLastEvent}s`;
-        
-        if (secondsSinceLastEvent < 10) {
-            timerBadge.style.background = '#28a745'; // Green
-        } else if (secondsSinceLastEvent < 20) {
-            timerBadge.style.background = '#ffc107'; // Yellow
-        } else {
-            timerBadge.style.background = '#dc3545'; // Red
-        }
-        
-        // Store reference
-        sessionLiveness.set(sessionID, {
-            seconds: secondsSinceLastEvent,
-            timerElement: timerBadge
-        });
     }
+    
+    // Find or create timer element
+    let timerElement = document.getElementById('livenessTimer');
+    if (!timerElement) {
+        timerElement = document.createElement('div');
+        timerElement.id = 'livenessTimer';
+        timerElement.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            background: #28a745;
+            color: white;
+            transition: background 0.3s ease;
+        `;
+        livenessContainer.appendChild(timerElement);
+    }
+    
+    // Update timer text and color based on time
+    timerElement.innerHTML = `⏱ Processing: ${secondsSinceLastEvent}s`;
+    
+    if (secondsSinceLastEvent < 10) {
+        timerElement.style.background = '#28a745'; // Green
+    } else if (secondsSinceLastEvent < 20) {
+        timerElement.style.background = '#ffc107'; // Yellow
+        timerElement.style.color = '#000'; // Dark text on yellow
+    } else {
+        timerElement.style.background = '#dc3545'; // Red
+        timerElement.style.color = '#fff'; // White text on red
+    }
+    
+    // Show the container
+    livenessContainer.style.display = 'flex';
+    
+    // Store reference
+    sessionLiveness.set(sessionID, {
+        seconds: secondsSinceLastEvent,
+        timerElement: timerElement,
+        container: livenessContainer
+    });
 }
 
 function handleRetryStart(data) {
@@ -898,10 +915,10 @@ function handleRetryStart(data) {
     // Show retry notification
     showRetryNotification(`🔄 Retrying session (attempt ${attemptNumber || 1}) due to ${reason}...`);
     
-    // Clear liveness timer
+    // Clear liveness timer - now located in status bar
     const liveness = sessionLiveness.get(sessionID);
-    if (liveness?.timerElement) {
-        liveness.timerElement.remove();
+    if (liveness?.container) {
+        liveness.container.style.display = 'none';
         sessionLiveness.delete(sessionID);
     }
 }
@@ -912,6 +929,12 @@ function handleRetrySuccess(data) {
     // Hide retry notification
     hideRetryNotification();
     
+    // Hide liveness timer
+    const livenessContainer = document.getElementById('livenessContainer');
+    if (livenessContainer) {
+        livenessContainer.style.display = 'none';
+    }
+    
     // Add success message
     addMessage('system', '✅ Session retry successful!', false, false, false, true);
 }
@@ -921,6 +944,12 @@ function handleRetryFailed(data) {
     
     // Hide retry notification
     hideRetryNotification();
+    
+    // Hide liveness timer
+    const livenessContainer = document.getElementById('livenessContainer');
+    if (livenessContainer) {
+        livenessContainer.style.display = 'none';
+    }
     
     // Show error
     addMessage('system', `❌ Session retry failed: ${error}`, false, true, false, true);
@@ -2033,6 +2062,12 @@ function connectWebSocket() {
                 
                 messageBuffer.delete(finalID);
                 removeTypingIndicator('assistant-typing');
+                
+                // Hide liveness timer when message completes
+                const livenessContainer = document.getElementById('livenessContainer');
+                if (livenessContainer) {
+                    livenessContainer.style.display = 'none';
+                }
                 
                 // Clean up progress bubbles for this message
                 const progressMap = progressBubbles.get(finalID);
