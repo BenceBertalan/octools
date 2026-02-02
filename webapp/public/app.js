@@ -1204,6 +1204,14 @@ async function loadMoreMessages() {
             const response = await fetch(`/api/session/${sessionID}/messages`);
             if (!response.ok) throw new Error('Failed to fetch messages');
             allMessages = await safeJson(response) || [];
+            
+            // Sort messages by creation time (oldest first)
+            allMessages.sort((a, b) => {
+                const timeA = a.info?.time?.created || 0;
+                const timeB = b.info?.time?.created || 0;
+                return timeA - timeB;
+            });
+            
             messagesCache.set(sessionID, allMessages);
         } catch (e) {
             console.error('Load more failed:', e);
@@ -2736,6 +2744,14 @@ async function syncSessionState(sessionID) {
         const response = await fetch(`/api/session/${sessionID}/messages?limit=20`);
         if (!response.ok) throw new Error('Failed to fetch messages');
         const messages = await safeJson(response) || [];
+        
+        // Sort messages by creation time (oldest first)
+        messages.sort((a, b) => {
+            const timeA = a.info?.time?.created || 0;
+            const timeB = b.info?.time?.created || 0;
+            return timeA - timeB;
+        });
+        
         let added = 0;
         messages.forEach(msg => {
             // Log all messages to Events tab
@@ -2969,6 +2985,13 @@ async function connectToSession(session) {
         if (!initialResponse.ok) throw new Error('Failed to fetch messages');
         const recentMessages = await safeJson(initialResponse) || [];
         
+        // Sort messages by creation time (oldest first)
+        recentMessages.sort((a, b) => {
+            const timeA = a.info?.time?.created || 0;
+            const timeB = b.info?.time?.created || 0;
+            return timeA - timeB;
+        });
+        
         console.log(`[UI] Fetched ${recentMessages.length} recent messages`);
         
         // Filter to last 12 hours
@@ -3053,6 +3076,14 @@ async function connectToSession(session) {
             .then(async (response) => {
                 if (!response.ok) throw new Error('Failed to fetch all messages');
                 const allMessages = await safeJson(response) || [];
+                
+                // Sort all messages by creation time (oldest first)
+                allMessages.sort((a, b) => {
+                    const timeA = a.info?.time?.created || 0;
+                    const timeB = b.info?.time?.created || 0;
+                    return timeA - timeB;
+                });
+                
                 console.log(`[UI] Background fetch complete: ${allMessages.length} total messages cached`);
                 
                 // Cache all messages
@@ -3091,6 +3122,14 @@ async function loadSessionHistory(id) {
         const response = await fetch(`/api/session/${id}/messages?limit=20`);
         if (!response.ok) throw new Error('Failed to fetch history');
         const msgs = await safeJson(response) || [];
+        
+        // Sort messages by creation time (oldest first)
+        msgs.sort((a, b) => {
+            const timeA = a.info?.time?.created || 0;
+            const timeB = b.info?.time?.created || 0;
+            return timeA - timeB;
+        });
+        
         msgs.forEach(msg => {
             const textParts = msg.parts.filter(p => p.type === 'text');
             const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
