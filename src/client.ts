@@ -228,6 +228,15 @@ export class OctoolsClient extends EventEmitter {
           }
           break;
 
+        case 'session.updated':
+          if (properties.info) {
+            this.emit('session.updated', {
+              sessionID: properties.info.id,
+              session: properties.info
+            });
+          }
+          break;
+
         default:
           // Emit raw event for debugging or other types
           this.emit('event', payload);
@@ -290,6 +299,22 @@ export class OctoolsClient extends EventEmitter {
       headers: this.headers
     });
     if (!res.ok) throw new Error(`Failed to load session: ${res.statusText}`);
+    const text = await res.text();
+    return JSON.parse(text) as Session;
+  }
+
+  public async updateSession(sessionID: string, updates: { title?: string }): Promise<Session> {
+    const res = await fetch(`${this.config.baseUrl}/session/${sessionID}`, {
+      method: 'PATCH',
+      headers: this.headers,
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new AuthError('Authentication failed: Unauthorized');
+      }
+      throw new Error(`Failed to update session: ${res.statusText}`);
+    }
     const text = await res.text();
     return JSON.parse(text) as Session;
   }

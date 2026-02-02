@@ -15,6 +15,7 @@
             <span class="status-text" id="statusText">Initializing...</span>
             <button id="reconnectBtn" style="display: none; padding: 2px 8px; font-size: 11px; margin-left: 8px;" class="btn-primary">Reconnect</button>
         </div>
+        <span class="session-name-display" id="sessionNameDisplay" style="display: none;">Session</span>
         <div style="display: flex; gap: 8px; align-items: center;">
             <button class="diff-btn" id="diffBtn" style="display: none;">
                 <span id="diffBtnText">📄 Files</span>
@@ -177,6 +178,27 @@
         </div>
     </div>
 
+    <!-- Edit Session Modal -->
+    <div class="modal" id="editSessionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Session Name</h3>
+                <button class="close-btn" id="closeEditSession">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="sessionNameInput">Session Name</label>
+                    <input type="text" id="sessionNameInput" placeholder="Enter session name..." autocomplete="off" spellcheck="false">
+                    <div class="session-id-hint" id="sessionIdHint"></div>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button class="btn-secondary" id="cancelEditSession">Cancel</button>
+                    <button class="btn-primary" id="saveSessionName">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Diff Drawer -->
     <div class="diff-drawer" id="diffDrawer">
         <div class="diff-drawer-header">
@@ -197,6 +219,9 @@
 
     <!-- Drawer overlay for mobile -->
     <div class="diff-drawer-overlay" id="diffDrawerOverlay"></div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <script src="app.js"></script>
 </body>

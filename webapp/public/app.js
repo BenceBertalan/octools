@@ -218,6 +218,51 @@ if (clearDiffBtn) {
     });
 }
 
+// Edit Session Modal event listeners
+const sessionNameDisplay = getEl('sessionNameDisplay');
+const editSessionModal = getEl('editSessionModal');
+const closeEditSession = getEl('closeEditSession');
+const cancelEditSession = getEl('cancelEditSession');
+const saveSessionNameBtn = getEl('saveSessionName');
+const sessionNameInput = getEl('sessionNameInput');
+
+if (sessionNameDisplay) {
+    sessionNameDisplay.addEventListener('click', showEditSessionModal);
+}
+
+if (closeEditSession) {
+    closeEditSession.addEventListener('click', hideEditSessionModal);
+}
+
+if (cancelEditSession) {
+    cancelEditSession.addEventListener('click', hideEditSessionModal);
+}
+
+if (saveSessionNameBtn) {
+    saveSessionNameBtn.addEventListener('click', saveSessionName);
+}
+
+if (sessionNameInput) {
+    sessionNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveSessionName();
+        } else if (e.key === 'Escape') {
+            hideEditSessionModal();
+        }
+    });
+}
+
+// Close modal on backdrop click
+if (editSessionModal) {
+    editSessionModal.addEventListener('click', (e) => {
+        if (e.target === editSessionModal) {
+            hideEditSessionModal();
+        }
+    });
+}
+
+
 function applyStoredPreferences() {
     if (getCookie('darkTheme') === 'true') {
         document.body.classList.add('dark');
@@ -226,6 +271,108 @@ function applyStoredPreferences() {
     if (getCookie('hideReasoning') === 'true') {
         document.body.classList.add('hide-reasoning');
         if (hideReasoningCheckbox) hideReasoningCheckbox.checked = true;
+    }
+}
+
+// Session Name Management
+function updateSessionNameDisplay() {
+    const sessionNameDisplay = getEl('sessionNameDisplay');
+    if (!sessionNameDisplay || !currentSession) return;
+    
+    const displayName = currentSession.title || `ses_${currentSession.id.slice(-8)}`;
+    sessionNameDisplay.textContent = displayName;
+    sessionNameDisplay.style.display = 'block';
+}
+
+function showEditSessionModal() {
+    const modal = getEl('editSessionModal');
+    const input = getEl('sessionNameInput');
+    const hint = getEl('sessionIdHint');
+    
+    if (!modal || !input || !currentSession) return;
+    
+    input.value = currentSession.title || '';
+    hint.textContent = `Session ID: ${currentSession.id}`;
+    modal.classList.add('active');
+    
+    setTimeout(() => {
+        input.focus();
+        input.select();
+    }, 100);
+}
+
+function hideEditSessionModal() {
+    const modal = getEl('editSessionModal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function saveSessionName() {
+    const input = getEl('sessionNameInput');
+    if (!input || !currentSessionID) return;
+    
+    const newName = input.value.trim();
+    
+    if (!newName) {
+        alert('Session name cannot be empty');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/session/${currentSessionID}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: newName })
+        });
+        
+        if (!response.ok) throw new Error('Failed to update session name');
+        
+        const updatedSession = await safeJson(response);
+        currentSession = updatedSession;
+        
+        updateSessionNameDisplay();
+        hideEditSessionModal();
+        showToast(`Session renamed to: ${newName}`, 'success');
+        
+    } catch (error) {
+        console.error('Error updating session name:', error);
+        alert('Failed to update session name: ' + error.message);
+    }
+}
+
+function showToast(message, type = 'info', duration = 3000) {
+    const container = getEl('toastContainer');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification ${type}`;
+    
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+    
+    toast.innerHTML = `
+        <span class="toast-icon">${icon}</span>
+        <span class="toast-message">${message}</span>
+    `;
+    
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+function handleSessionUpdated(data) {
+    if (!data.session || !currentSession || data.sessionID !== currentSessionID) return;
+    
+    const oldTitle = currentSession.title;
+    const newTitle = data.session.title;
+    
+    currentSession = data.session;
+    updateSessionNameDisplay();
+    
+    if (oldTitle !== newTitle && newTitle) {
+        showToast(`Session renamed to: ${newTitle}`, 'info');
     }
 }
 
@@ -1159,6 +1306,9 @@ function connectWebSocket() {
             case 'session.diff':
                 handleSessionDiff(data);
                 break;
+            case 'session.updated':
+                handleSessionUpdated(data);
+                break;
         }
     };
     
@@ -1318,6 +1468,9 @@ async function connectToSession(session) {
     currentSession = session;
     currentSessionID = session.id;
     currentDrawerSession = session.id;
+    
+    // Update session name display
+    updateSessionNameDisplay();
     
     // Reset diff drawer for new session
     expandedDiffs.clear();

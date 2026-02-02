@@ -1226,4 +1226,133 @@ body.dark .diff-line-context {
     .diff-drawer.open {
         right: 0;
     }
+
+    .session-name-display {
+        max-width: 150px !important;
+    }
+
+    .toast-notification {
+        left: 10px;
+        right: 10px;
+        top: 60px;
+        min-width: auto;
+    }
 }
+
+/* Session Name Display */
+.session-name-display {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-color);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    user-select: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+    flex-shrink: 1;
+    background-color: var(--secondary-color);
+}
+
+.session-name-display:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Session ID Hint */
+.session-id-hint {
+    font-size: 11px;
+    color: #666;
+    margin-top: 6px;
+    font-family: 'Courier New', monospace;
+}
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast-notification {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 250px;
+    max-width: 400px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    pointer-events: auto;
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast-notification.success {
+    border-left: 4px solid var(--success-color);
+}
+
+.toast-notification.error {
+    border-left: 4px solid var(--error-color);
+}
+
+.toast-notification.info {
+    border-left: 4px solid var(--primary-color);
+}
+
+.toast-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.toast-message {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-color);
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Dark Mode for Session Name & Toast */
+body.dark-theme .session-name-display {
+    background-color: #2c2c2e;
+    color: #e0e0e0;
+}
+
+body.dark-theme .session-name-display:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+body.dark-theme .session-id-hint {
+    color: #999;
+}
+
+body.dark-theme .toast-notification {
+    background: #2c2c2e;
+    border-color: #444;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-theme .toast-message {
+    color: #e0e0e0;
+}
+

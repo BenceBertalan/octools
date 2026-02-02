@@ -116,6 +116,20 @@ app.get('/api/session/:sessionID', async (req, res) => {
   }
 });
 
+app.patch('/api/session/:sessionID', async (req, res) => {
+  try {
+    const { title } = req.body;
+    const session = await octoolsClient.updateSession(req.params.sessionID, { title });
+    res.json(session);
+  } catch (error) {
+    if (error instanceof AuthError || error.statusCode === 401 || error.message.includes('Authentication failed')) {
+      res.status(401).json({ error: 'Authentication failed', details: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
 app.get('/api/sessions', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 20;
@@ -295,6 +309,11 @@ wss.on('connection', (ws) => {
     'session.diff': (data) => {
       if (currentSessionID === data.sessionID) {
         ws.send(JSON.stringify({ type: 'session.diff', data }));
+      }
+    },
+    'session.updated': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.updated', data }));
       }
     },
     'error': (error) => {
