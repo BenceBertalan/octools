@@ -172,7 +172,9 @@ body {
     word-break: break-word;
     overflow-wrap: break-word;
     white-space: pre-wrap;
-    overflow: hidden;
+    /* Allow content to expand naturally */
+    min-height: fit-content;
+    height: auto;
 }
 
 .message-bubble.user {
