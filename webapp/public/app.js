@@ -1603,7 +1603,9 @@ function updateCompletedToolsSummary(messageID) {
     const moreCount = completed.length > displayCount ? completed.length - displayCount : 0;
     const moreText = moreCount > 0 ? ` · ${moreCount} more` : '';
     
-    summary.innerHTML = `✅ ${displayTools}${moreText} completed`;
+    // Show agent names in the summary
+    const agentText = completed.length === 1 ? completed[0] : `${completed.length} agents`;
+    summary.innerHTML = `✅ ${agentText}${completed.length === 1 ? '' : ` (${displayTools}${moreText})`} completed`;
     summary.style.cursor = 'pointer';
     summary.title = 'Click to view completed tools';
     
@@ -2520,18 +2522,38 @@ function addEvent(type, data) {
 }
 
 function addTypingIndicator(id) {
-    if (!messagesContainer || document.getElementById(id)) return;
+    const typingArea = document.getElementById('typingIndicatorArea');
+    if (!typingArea) return;
+    
+    // Check if indicator already exists
+    if (document.getElementById(id)) return;
+    
+    // Show the typing area
+    typingArea.style.display = 'block';
+    
+    // Add class to messages container for padding
+    if (messagesContainer) messagesContainer.classList.add('with-typing');
+    
     const indicator = document.createElement('div');
     indicator.id = id;
     indicator.className = 'typing-indicator';
     indicator.innerHTML = '<span></span><span></span><span></span>';
-    messagesContainer.appendChild(indicator);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    typingArea.appendChild(indicator);
+    
+    // Scroll messages to bottom
+    if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 function removeTypingIndicator(id) {
     const indicator = document.getElementById(id);
     if (indicator) indicator.remove();
+    
+    // Hide typing area if no more indicators
+    const typingArea = document.getElementById('typingIndicatorArea');
+    if (typingArea && typingArea.children.length === 0) {
+        typingArea.style.display = 'none';
+        if (messagesContainer) messagesContainer.classList.remove('with-typing');
+    }
 }
 
 function updateSubagentProgress(data) {

@@ -1815,13 +1815,14 @@ body.dark .progress-task {
     border: 1px solid #81c784;
     border-radius: 8px;
     padding: 8px 12px;
-    margin: 8px auto;
+    margin: 8px 0 8px 0;
     max-width: 90%;
-    text-align: center;
+    text-align: left;
     font-size: 12px;
     color: #2e7d32;
     font-weight: 500;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    align-self: flex-start;
 }
 
 /* Diff Drawer Button */
@@ -2599,6 +2600,21 @@ body.dark .tool-section-title {
     opacity: 1;
 }
 
+body.dark .favorite-btn {
+    color: #ffd700;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+    opacity: 0.5;
+}
+
+body.dark .favorite-btn:hover {
+    opacity: 0.8;
+}
+
+body.dark .favorite-btn.favorited {
+    opacity: 1;
+    color: #ffd700;
+}
+
 .message-bubble {
     position: relative;
 }
@@ -2696,15 +2712,38 @@ body {
     padding: calc(8px * var(--ui-scale, 1)) calc(16px * var(--ui-scale, 1));
 }
 
-/* Typing indicator always at bottom */
-.typing-indicator {
-    position: sticky;
+/* Typing indicator now in fixed area - see .typing-indicator-area */
+
+/* Fixed typing indicator area at bottom */
+.typing-indicator-area {
+    position: absolute;
     bottom: 0;
+    left: 0;
+    right: 0;
     background: var(--bg-color);
-    padding: 10px 0;
-    z-index: 5;
+    border-top: 1px solid var(--border-color);
+    padding: 10px 20px;
+    z-index: 100;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
 
-body.dark .typing-indicator {
+body.dark .typing-indicator-area {
     background: #1a1a1a;
+    border-top-color: #333;
+}
+
+.typing-indicator-area .typing-indicator {
+    position: static;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+/* Adjust messages container to account for typing indicator */
+#chatTab {
+    position: relative;
+}
+
+.messages-container.with-typing {
+    padding-bottom: 60px;
 }
