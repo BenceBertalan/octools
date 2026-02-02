@@ -55,20 +55,7 @@
                         <option value="">Model: Default</option>
                     </select>
                 </div>
-                <div class="qs-item toggle">
-                    <label class="switch">
-                        <input type="checkbox" id="hideReasoning">
-                        <span class="slider"></span>
-                    </label>
-                    <span>Hide Reasoning</span>
-                </div>
-                <div class="qs-item toggle">
-                    <label class="switch">
-                        <input type="checkbox" id="darkTheme">
-                        <span class="slider"></span>
-                    </label>
-                    <span>Dark Mode</span>
-                </div>
+                <button id="qsSendBtn" class="qs-send-btn" disabled>Send ➤</button>
             </div>
             
             <div class="input-container" id="inputContainer">
@@ -143,6 +130,7 @@
             <div class="settings-tabs">
                 <button class="settings-tab-btn active" data-settings-tab="existing">Existing</button>
                 <button class="settings-tab-btn" data-settings-tab="new">New Session</button>
+                <button class="settings-tab-btn" data-settings-tab="preferences">Preferences</button>
             </div>
 
             <div class="modal-body">
@@ -179,6 +167,27 @@
                         <input type="text" id="directoryInput" value="/root" autocomplete="off" spellcheck="false">
                     </div>
                     <button class="btn-primary" id="createSessionBtn" style="width: 100%;">Create New Session</button>
+                </div>
+
+                <div id="preferencesTab" class="settings-tab-content">
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="showReasoning">
+                            <span class="toggle-text">Show Reasoning</span>
+                        </label>
+                        <small style="color: #90949c; font-size: 12px; margin-top: 4px; display: block;">
+                            Display internal reasoning process in messages
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="darkTheme">
+                            <span class="toggle-text">Dark Mode</span>
+                        </label>
+                        <small style="color: #90949c; font-size: 12px; margin-top: 4px; display: block;">
+                            Use dark color scheme
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>

@@ -64,8 +64,9 @@ const sessionSearch = getEl('sessionSearch');
 const qsAgentSelect = getEl('qsAgentSelect');
 const qsModelSelect = getEl('qsModelSelect');
 const sessionList = getEl('sessionList');
-const hideReasoningCheckbox = getEl('hideReasoning');
+const showReasoningCheckbox = getEl('showReasoning');
 const darkThemeCheckbox = getEl('darkTheme');
+const qsSendBtn = getEl('qsSendBtn');
 
 // Rich editor DOM elements
 const inputContainer = getEl('inputContainer');
@@ -99,7 +100,12 @@ document.querySelectorAll('.settings-tab-btn').forEach(btn => {
         document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
-        const targetId = tab === 'existing' ? 'existingSessionsTab' : 'newSessionTab';
+        
+        let targetId;
+        if (tab === 'existing') targetId = 'existingSessionsTab';
+        else if (tab === 'new') targetId = 'newSessionTab';
+        else if (tab === 'preferences') targetId = 'preferencesTab';
+        
         const target = getEl(targetId);
         if (target) target.classList.add('active');
         if (tab === 'existing') loadExistingSessions();
@@ -445,7 +451,9 @@ if (messageInput) {
     messageInput.addEventListener('input', () => {
         messageInput.style.height = 'auto';
         messageInput.style.height = messageInput.scrollHeight + 'px';
-        if (sendBtn) sendBtn.disabled = !messageInput.value.trim();
+        const hasContent = messageInput.value.trim().length > 0;
+        if (sendBtn) sendBtn.disabled = !hasContent;
+        if (qsSendBtn) qsSendBtn.disabled = !hasContent;
     });
 }
 
@@ -490,11 +498,18 @@ if (darkThemeCheckbox) {
     });
 }
 
-if (hideReasoningCheckbox) {
-    hideReasoningCheckbox.addEventListener('change', (e) => {
-        document.body.classList.toggle('hide-reasoning', e.target.checked);
-        setCookie('hideReasoning', e.target.checked ? 'true' : 'false');
+if (showReasoningCheckbox) {
+    showReasoningCheckbox.addEventListener('change', (e) => {
+        // When checked, SHOW reasoning (remove hide class)
+        // When unchecked, HIDE reasoning (add hide class)
+        document.body.classList.toggle('hide-reasoning', !e.target.checked);
+        setCookie('showReasoning', e.target.checked ? 'true' : 'false');
     });
+}
+
+// Quick Settings Send Button
+if (qsSendBtn) {
+    qsSendBtn.addEventListener('click', sendMessage);
 }
 
 if (qsAgentSelect) {
@@ -622,6 +637,7 @@ if (richEditor) {
     richEditor.addEventListener('input', () => {
         const hasContent = richEditor.textContent.trim().length > 0;
         if (sendBtn) sendBtn.disabled = !hasContent;
+        if (qsSendBtn) qsSendBtn.disabled = !hasContent;
     });
 }
 
@@ -631,6 +647,7 @@ if (messageInput) {
         if (editorMode === 'simple') {
             const hasContent = messageInput.value.trim().length > 0;
             if (sendBtn) sendBtn.disabled = !hasContent;
+            if (qsSendBtn) qsSendBtn.disabled = !hasContent;
         }
     });
 }
@@ -650,9 +667,21 @@ function applyStoredPreferences() {
         document.body.classList.add('dark');
         if (darkThemeCheckbox) darkThemeCheckbox.checked = true;
     }
-    if (getCookie('hideReasoning') === 'true') {
+    
+    // Show reasoning is now the toggle (opposite of hideReasoning)
+    const showReasoning = getCookie('showReasoning');
+    if (showReasoning === 'false') {
+        // User explicitly turned OFF show reasoning, so hide it
         document.body.classList.add('hide-reasoning');
-        if (hideReasoningCheckbox) hideReasoningCheckbox.checked = true;
+        if (showReasoningCheckbox) showReasoningCheckbox.checked = false;
+    } else if (showReasoning === 'true') {
+        // User explicitly turned ON show reasoning
+        document.body.classList.remove('hide-reasoning');
+        if (showReasoningCheckbox) showReasoningCheckbox.checked = true;
+    } else {
+        // Default: hide reasoning (show checkbox unchecked)
+        document.body.classList.add('hide-reasoning');
+        if (showReasoningCheckbox) showReasoningCheckbox.checked = false;
     }
 }
 
@@ -808,9 +837,10 @@ function createReasoningSection(reasoningParts, messageID) {
     const section = document.createElement('div');
     section.className = 'reasoning-section';
     
-    // Get default state from cookie or hideReasoning checkbox
-    const hideByDefault = getCookie('hideReasoning') === 'true';
-    const isExpanded = reasoningExpanded.get(messageID) ?? !hideByDefault;
+    // Get default state from cookie - show reasoning is now the preference
+    const showReasoning = getCookie('showReasoning');
+    const showByDefault = showReasoning === 'true'; // Default is false (hidden)
+    const isExpanded = reasoningExpanded.get(messageID) ?? showByDefault;
     
     const toggle = document.createElement('button');
     toggle.className = 'reasoning-toggle' + (isExpanded ? ' expanded' : '');
@@ -1321,6 +1351,7 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
 
     clearEditorContent();
     if (sendBtn) sendBtn.disabled = true;
+    if (qsSendBtn) qsSendBtn.disabled = true;
     
     const agent = customAgent !== null ? customAgent : (qsAgentSelect ? qsAgentSelect.value : undefined);
     const modelStr = customModel !== null ? customModel : (qsModelSelect ? qsModelSelect.value : undefined);
@@ -1351,6 +1382,7 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
         alert('Failed to send message: ' + error.message);
     } finally {
         if (sendBtn) sendBtn.disabled = false;
+        if (qsSendBtn) qsSendBtn.disabled = false;
     }
 }
 

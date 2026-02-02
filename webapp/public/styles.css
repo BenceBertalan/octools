@@ -813,6 +813,90 @@ body.dark .option-item-inline {
 
 .qs-item select { width: auto; max-width: 150px; padding: 6px 10px; }
 
+/* Quick Settings Send Button */
+.qs-send-btn {
+    padding: 8px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    margin-left: auto;
+}
+
+.qs-send-btn:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: scale(1.05);
+}
+
+.qs-send-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Toggle Labels in Preferences */
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 44px;
+    height: 24px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: #ccc;
+    border-radius: 24px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.toggle-label input[type="checkbox"]:checked {
+    background: var(--primary-color);
+}
+
+.toggle-label input[type="checkbox"]::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+}
+
+.toggle-label input[type="checkbox"]:checked::before {
+    transform: translateX(20px);
+}
+
+.toggle-text {
+    font-weight: 500;
+    font-size: 14px;
+}
+
+/* Dark mode for toggles and send button */
+body.dark .qs-send-btn:disabled {
+    background: #4e4f50;
+}
+
+body.dark .toggle-label input[type="checkbox"] {
+    background: #4e4f50;
+}
+
+body.dark .toggle-label input[type="checkbox"]:checked {
+    background: var(--primary-color);
+}
+
 /* Custom select arrow */
 .form-group select, .qs-item select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2365676b' d='M1 4l5 5 5-5z'/%3E%3C/svg%3E");
@@ -1069,13 +1153,26 @@ body.dark .rich-editor pre {
     background: #2c2c2e;
 }
 
+body.dark .rich-editor ul, .rich-editor ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+body.dark .rich-editor li {
+    margin: 4px 0;
+    color: #e4e6eb;
+}
+
+body.dark .rich-editor a {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
 body.dark .edit-warning {
     background: #4a3f00;
     border-color: #ffb74d;
     color: #ffe0b2;
 }
-
-body.dark .btn-secondary {
     background: #3a3b3c;
     color: #e4e6eb;
 }
@@ -1678,9 +1775,19 @@ body.dark .diff-line-context {
 }
 
 /* Dark Mode for Session Name & Toast */
+body.dark .session-name-display {
+    background-color: #3a3b3c;
+    color: #e4e6eb;
+}
+
+body.dark .session-name-display:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
 body.dark-theme .session-name-display {
-    background-color: #2c2c2e;
-    color: #e0e0e0;
+    background-color: #3a3b3c;
+    color: #e4e6eb;
 }
 
 body.dark-theme .session-name-display:hover {
