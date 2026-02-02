@@ -85,7 +85,8 @@ const messageInput = getEl('messageInput');
 const sendBtn = getEl('sendBtn');
 const abortBtn = getEl('abortBtn');
 const messagesContainer = getEl('messagesContainer');
-const loadingOverlay = getEl('loadingOverlay');
+const loadingModal = getEl('loadingModal');
+const loadingText = getEl('loadingText');
 const progressFill = getEl('progressFill');
 const loadingStats = getEl('loadingStats');
 const eventsContainer = getEl('eventsContainer');
@@ -2835,6 +2836,13 @@ async function loadExistingSessions(search = '') {
 
 async function connectToSession(session) {
     console.log('[UI] Connecting to session:', session.id);
+    
+    // Show loading modal
+    if (loadingModal) loadingModal.style.display = 'block';
+    if (loadingText) loadingText.textContent = 'Connecting to session...';
+    if (progressFill) progressFill.style.width = '0%';
+    if (loadingStats) loadingStats.textContent = '0 / 0';
+    
     currentSession = session;
     currentSessionID = session.id;
     currentDrawerSession = session.id;
@@ -2850,21 +2858,22 @@ async function connectToSession(session) {
         renderDiffDrawer(diffs);
     }
     
-    // Clear messages container and show loading overlay
+    // Clear messages container
     if (messagesContainer) messagesContainer.innerHTML = '';
-    if (loadingOverlay) loadingOverlay.style.display = 'flex';
-    if (progressFill) progressFill.style.width = '0%';
-    if (loadingStats) loadingStats.textContent = '0 / 0';
     
     try {
         // Fetch all messages without limit
+        if (loadingText) loadingText.textContent = 'Fetching messages...';
+        if (progressFill) progressFill.style.width = '10%';
+        
         const response = await fetch(`/api/session/${session.id}/messages`);
         if (!response.ok) throw new Error('Failed to fetch messages');
         const allMessages = await safeJson(response) || [];
         
         // Update progress: fetched all messages
-        if (loadingStats) loadingStats.textContent = `Fetched ${allMessages.length} messages`;
-        if (progressFill) progressFill.style.width = '25%';
+        if (loadingText) loadingText.textContent = `Fetched ${allMessages.length} messages`;
+        if (loadingStats) loadingStats.textContent = `${allMessages.length} messages fetched`;
+        if (progressFill) progressFill.style.width = '30%';
         
         // Cache messages
         messagesCache.set(session.id, allMessages);
@@ -2878,6 +2887,7 @@ async function connectToSession(session) {
         oldestDisplayedIndex.set(session.id, startIndex);
         
         // Update progress: processing messages
+        if (loadingText) loadingText.textContent = 'Processing messages...';
         if (progressFill) progressFill.style.width = '50%';
         
         if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
@@ -2890,7 +2900,8 @@ async function connectToSession(session) {
         }
         
         // Update progress: rendering messages
-        if (progressFill) progressFill.style.width = '75%';
+        if (loadingText) loadingText.textContent = 'Rendering messages...';
+        if (progressFill) progressFill.style.width = '60%';
         
         // Render messages with progress updates
         let processedCount = 0;
@@ -2924,19 +2935,23 @@ async function connectToSession(session) {
             if (loadingStats) loadingStats.textContent = `Loading ${processedCount} / ${messagesToShow.length}`;
             
             // Update progress during rendering
-            const renderProgress = 75 + (processedCount / messagesToShow.length) * 25;
+            const renderProgress = 60 + (processedCount / messagesToShow.length) * 40;
             if (progressFill) progressFill.style.width = `${renderProgress}%`;
         }
         
-        // Complete - hide loading overlay
+        // Complete - hide loading modal
+        if (loadingText) loadingText.textContent = 'Complete!';
         if (progressFill) progressFill.style.width = '100%';
         setTimeout(() => {
-            if (loadingOverlay) loadingOverlay.style.display = 'none';
-        }, 300);
+            if (loadingModal) loadingModal.style.display = 'none';
+        }, 500);
         
     } catch (e) { 
         addEvent('Error', 'Connect failed: ' + e.message);
-        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        if (loadingText) loadingText.textContent = 'Error: ' + e.message;
+        setTimeout(() => {
+            if (loadingModal) loadingModal.style.display = 'none';
+        }, 2000);
     }
 }
 
