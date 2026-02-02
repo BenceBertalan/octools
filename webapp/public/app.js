@@ -404,7 +404,7 @@ function loadAgentSettingsPage() {
     content.innerHTML = `
         <div class="settings-section">
             <h3>Agent & Model Configuration</h3>
-            <p>Configure agent and model settings for your sessions.</p>
+            <p>Configure default models for specific agents.</p>
             <div class="form-group">
                 <label>Agent Selection</label>
                 <select id="pageAgentSelect" class="form-control">
@@ -412,9 +412,9 @@ function loadAgentSettingsPage() {
                 </select>
             </div>
             <div class="form-group">
-                <label>Model Selection</label>
+                <label>Default Model</label>
                 <select id="pageModelSelect" class="form-control">
-                    <option value="">Loading...</option>
+                    <option value="">Use agent default</option>
                 </select>
             </div>
             <button class="btn-primary" id="saveAgentSettings">Save Settings</button>
@@ -422,8 +422,32 @@ function loadAgentSettingsPage() {
     `;
     
     // Load agents and models
-    loadAgentsForPage();
+    loadAgentsForPage().then(() => {
+         // Default to first agent if available
+         const select = document.getElementById('pageAgentSelect');
+         if (select && select.options.length > 1) {
+             select.selectedIndex = 1; // Skip "Select an agent..."
+             select.dispatchEvent(new Event('change'));
+         }
+    });
     loadModelsForPage();
+    
+    // Wire events
+    const agentSelect = document.getElementById('pageAgentSelect');
+    const saveBtn = document.getElementById('saveAgentSettings');
+    
+    if (agentSelect) {
+        agentSelect.addEventListener('change', async () => {
+             const agentName = agentSelect.value;
+             if (agentName) await loadPageAgentConfig(agentName);
+        });
+    }
+    
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+             await savePageAgentConfig();
+        });
+    }
 }
 
 function loadModelPriorityPage() {
@@ -469,12 +493,12 @@ async function loadModelsForPage() {
     
     try {
         const models = await fetch('/api/models').then(r => r.json());
-        select.innerHTML = '<option value="">Select a model...</option>';
+        select.innerHTML = '<option value="">Use agent default</option>';
         
         // Group by provider
         const grouped = {};
         models.forEach(model => {
-            const provider = model.provider || 'Other';
+            const provider = model.providerID || 'Other';
             if (!grouped[provider]) grouped[provider] = [];
             grouped[provider].push(model);
         });
@@ -484,14 +508,98 @@ async function loadModelsForPage() {
             optgroup.label = provider;
             grouped[provider].forEach(model => {
                 const option = document.createElement('option');
-                option.value = model.id;
-                option.textContent = model.name || model.id;
+                option.value = JSON.stringify({ providerID: model.providerID, modelID: model.modelID });
+                option.textContent = model.name || model.modelID;
                 optgroup.appendChild(option);
             });
             select.appendChild(optgroup);
         });
     } catch (e) {
         select.innerHTML = '<option value="">Failed to load models</option>';
+    }
+}
+
+async function loadPageAgentConfig(agentName) {
+    try {
+        const config = await fetch('/api/config').then(r => r.json());
+        const agentConfig = config.agent || {};
+        const settings = agentConfig[agentName] || {};
+        
+        const modelSelect = document.getElementById('pageModelSelect');
+        if (modelSelect) {
+            if (settings.model) {
+                // Try direct match (if strict JSON string match works)
+                const targetVal = JSON.stringify(settings.model);
+                modelSelect.value = targetVal;
+                
+                // If direct match fails (e.g. key order), iterate to find match
+                if (!modelSelect.value && modelSelect.options) {
+                     for (let i = 0; i < modelSelect.options.length; i++) {
+                         try {
+                             const optVal = JSON.parse(modelSelect.options[i].value);
+                             if (optVal && settings.model && 
+                                 optVal.providerID === settings.model.providerID && 
+                                 optVal.modelID === settings.model.modelID) {
+                                 modelSelect.selectedIndex = i;
+                                 break;
+                             }
+                         } catch (e) {}
+                     }
+                }
+            } else {
+                modelSelect.value = "";
+            }
+        }
+    } catch (e) {
+        console.error('Error loading agent config:', e);
+    }
+}
+
+async function savePageAgentConfig() {
+    const agentSelect = document.getElementById('pageAgentSelect');
+    const modelSelect = document.getElementById('pageModelSelect');
+    
+    if (!agentSelect || !agentSelect.value) {
+        alert('Please select an agent');
+        return;
+    }
+    
+    const agentName = agentSelect.value;
+    let model = null;
+    if (modelSelect.value) {
+        try {
+            model = JSON.parse(modelSelect.value);
+        } catch (e) {}
+    }
+    
+    try {
+        const update = {
+            agent: {
+                [agentName]: {
+                    model: model
+                }
+            }
+        };
+        
+        const res = await fetch('/api/config', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(update)
+        });
+        
+        if (res.ok) {
+            const btn = document.getElementById('saveAgentSettings');
+            if (btn) {
+                const originalText = btn.textContent;
+                btn.textContent = 'Saved!';
+                setTimeout(() => btn.textContent = originalText, 2000);
+            }
+        } else {
+            alert('Failed to save settings');
+        }
+    } catch (e) {
+        console.error('Error saving config:', e);
+        alert('Error saving settings');
     }
 }
 

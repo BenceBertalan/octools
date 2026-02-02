@@ -3,6 +3,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const { OctoolsClient, AuthError } = require('../dist/index.js');
+const db = require('./database');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,22 +15,6 @@ const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes
 
 // Store active sessions and their clients
 const sessions = new Map();
-
-// In-memory config storage (until OpenCode server supports global config)
-let globalConfig = {
-  agent: {},
-  model_priority: {
-    enabled: false,
-    models: []
-  }
-};
-
-// In-memory notes storage
-// Structure: { global: [...], sessions: { sessionID: [...] } }
-let notesStorage = {
-  global: [],
-  sessions: {}
-};
 
 const octoolsClient = new OctoolsClient({
   baseUrl: OPENCODE_URL,
@@ -66,7 +51,13 @@ app.get('/api/agents', async (req, res) => {
 // Get global config
 app.get('/api/config', async (req, res) => {
   try {
-    res.json(globalConfig);
+    const agentRow = await db.get('SELECT value FROM config WHERE key = ?', ['agent']);
+    const priorityRow = await db.get('SELECT value FROM config WHERE key = ?', ['model_priority']);
+    
+    res.json({
+      agent: agentRow ? JSON.parse(agentRow.value) : {},
+      model_priority: priorityRow ? JSON.parse(priorityRow.value) : { enabled: false, models: [] }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -75,14 +66,28 @@ app.get('/api/config', async (req, res) => {
 // Update global config
 app.patch('/api/config', async (req, res) => {
   try {
-    // Merge the updates into global config
     if (req.body.agent) {
-      globalConfig.agent = { ...globalConfig.agent, ...req.body.agent };
+       const row = await db.get('SELECT value FROM config WHERE key = ?', ['agent']);
+       const current = row ? JSON.parse(row.value) : {};
+       const updated = { ...current, ...req.body.agent };
+       await db.run('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', ['agent', JSON.stringify(updated)]);
     }
+    
     if (req.body.model_priority) {
-      globalConfig.model_priority = { ...globalConfig.model_priority, ...req.body.model_priority };
+       const row = await db.get('SELECT value FROM config WHERE key = ?', ['model_priority']);
+       const current = row ? JSON.parse(row.value) : { enabled: false, models: [] };
+       const updated = { ...current, ...req.body.model_priority };
+       await db.run('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', ['model_priority', JSON.stringify(updated)]);
     }
-    res.json(globalConfig);
+    
+    // Return updated config
+    const agentRow = await db.get('SELECT value FROM config WHERE key = ?', ['agent']);
+    const priorityRow = await db.get('SELECT value FROM config WHERE key = ?', ['model_priority']);
+    
+    res.json({
+        agent: agentRow ? JSON.parse(agentRow.value) : {},
+        model_priority: priorityRow ? JSON.parse(priorityRow.value) : { enabled: false, models: [] }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -93,13 +98,24 @@ app.patch('/api/config', async (req, res) => {
 app.get('/api/notes', async (req, res) => {
   try {
     const { sessionID } = req.query;
+    let notes;
     if (sessionID) {
-      // Return session-specific notes
-      res.json(notesStorage.sessions[sessionID] || []);
+      notes = await db.all('SELECT * FROM notes WHERE session_id = ? ORDER BY created_at DESC', [sessionID]);
     } else {
-      // Return global notes
-      res.json(notesStorage.global);
+      notes = await db.all('SELECT * FROM notes WHERE session_id IS NULL ORDER BY created_at DESC');
     }
+    
+    // Map DB columns to API response format
+    const response = notes.map(n => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        sessionID: n.session_id,
+        created: n.created_at,
+        updated: n.updated_at
+    }));
+    
+    res.json(response);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -118,16 +134,10 @@ app.post('/api/notes', async (req, res) => {
       updated: Date.now()
     };
     
-    if (sessionID) {
-      // Add to session-specific notes
-      if (!notesStorage.sessions[sessionID]) {
-        notesStorage.sessions[sessionID] = [];
-      }
-      notesStorage.sessions[sessionID].push(note);
-    } else {
-      // Add to global notes
-      notesStorage.global.push(note);
-    }
+    await db.run(
+        'INSERT INTO notes (id, title, content, session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [note.id, note.title, note.content, note.sessionID, note.created, note.updated]
+    );
     
     res.json(note);
   } catch (error) {
@@ -139,31 +149,32 @@ app.post('/api/notes', async (req, res) => {
 app.patch('/api/notes/:noteID', async (req, res) => {
   try {
     const { noteID } = req.params;
-    const { title, content, sessionID } = req.body;
+    const { title, content } = req.body; // We don't update sessionID usually
     
-    // Find and update the note
-    let found = false;
-    const updateNote = (note) => {
-      if (note.id === noteID) {
-        if (title !== undefined) note.title = title;
-        if (content !== undefined) note.content = content;
-        note.updated = Date.now();
-        found = true;
-        return note;
-      }
-      return note;
-    };
-    
-    // Check global notes
-    notesStorage.global = notesStorage.global.map(updateNote);
-    
-    // Check session notes
-    Object.keys(notesStorage.sessions).forEach(sid => {
-      notesStorage.sessions[sid] = notesStorage.sessions[sid].map(updateNote);
-    });
-    
-    if (!found) {
+    // First check if note exists
+    const note = await db.get('SELECT * FROM notes WHERE id = ?', [noteID]);
+    if (!note) {
       return res.status(404).json({ error: 'Note not found' });
+    }
+    
+    const updates = [];
+    const params = [];
+    
+    if (title !== undefined) {
+        updates.push('title = ?');
+        params.push(title);
+    }
+    if (content !== undefined) {
+        updates.push('content = ?');
+        params.push(content);
+    }
+    
+    if (updates.length > 0) {
+        updates.push('updated_at = ?');
+        params.push(Date.now());
+        params.push(noteID);
+        
+        await db.run(`UPDATE notes SET ${updates.join(', ')} WHERE id = ?`, params);
     }
     
     res.json({ success: true });
@@ -176,15 +187,7 @@ app.patch('/api/notes/:noteID', async (req, res) => {
 app.delete('/api/notes/:noteID', async (req, res) => {
   try {
     const { noteID } = req.params;
-    
-    // Remove from global notes
-    notesStorage.global = notesStorage.global.filter(n => n.id !== noteID);
-    
-    // Remove from session notes
-    Object.keys(notesStorage.sessions).forEach(sid => {
-      notesStorage.sessions[sid] = notesStorage.sessions[sid].filter(n => n.id !== noteID);
-    });
-    
+    await db.run('DELETE FROM notes WHERE id = ?', [noteID]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
