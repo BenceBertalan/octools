@@ -10,19 +10,38 @@
 <body>
     <!-- Top Status Bar -->
     <div class="status-bar" id="statusBar">
-        <div class="status-info">
-            <span class="status-dot" id="statusDot"></span>
-            <span class="status-text" id="statusText">Initializing...</span>
-            <button id="reconnectBtn" style="display: none; padding: 2px 8px; font-size: 11px; margin-left: 8px;" class="btn-primary">Reconnect</button>
+        <!-- Hamburger Menu -->
+        <button class="hamburger-btn" id="hamburgerBtn">☰</button>
+        
+        <!-- Status Content (Two Rows) -->
+        <div class="status-content">
+            <!-- First Row: Session name and status -->
+            <div class="status-row-1">
+                <span class="session-name-display" id="sessionNameDisplay">No Session</span>
+                <span class="status-dot" id="statusDot"></span>
+                <span class="status-text" id="statusText">Initializing...</span>
+                <button id="reconnectBtn" style="display: none; padding: 2px 8px; font-size: 11px; margin-left: 8px;" class="btn-primary">Reconnect</button>
+            </div>
+            
+            <!-- Second Row: Liveness indicator -->
+            <div class="status-row-2" id="livenessRow" style="display: none;">
+                <span class="liveness-label">Message retry in:</span>
+                <span class="liveness-countdown" id="livenessCountdown">--</span>
+            </div>
         </div>
-        <span class="session-name-display" id="sessionNameDisplay" style="display: none;">Session</span>
+        
+        <!-- Right Side: Files button -->
         <div style="display: flex; gap: 8px; align-items: center;">
             <button class="diff-btn" id="diffBtn" style="display: none;">
                 <span id="diffBtnText">📄 Files</span>
                 <span id="diffBadge" class="diff-badge" style="display: none;">0</span>
             </button>
-            <button class="settings-btn" id="settingsBtn">⚙️</button>
         </div>
+    </div>
+    
+    <!-- Hamburger Menu Dropdown -->
+    <div class="hamburger-menu" id="hamburgerMenu" style="display: none;">
+        <div class="hamburger-menu-item" id="menuSettings">⚙️ Settings</div>
     </div>
 
     <!-- Main Container -->
@@ -199,6 +218,13 @@
                         </label>
                         <small style="color: #90949c; font-size: 12px; margin-top: 4px; display: block;">
                             Use dark color scheme
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="livenessTimeout">Liveness Timeout (seconds)</label>
+                        <input type="number" id="livenessTimeout" value="30" min="10" max="300" step="5" autocomplete="off">
+                        <small style="color: #90949c; font-size: 12px; margin-top: 4px; display: block;">
+                            Time before automatic message retry (10-300 seconds)
                         </small>
                     </div>
                 </div>

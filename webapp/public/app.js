@@ -81,7 +81,9 @@ const getEl = (id) => {
 const statusDot = getEl('statusDot');
 const statusText = getEl('statusText');
 const reconnectBtn = getEl('reconnectBtn');
-const settingsBtn = getEl('settingsBtn');
+const hamburgerBtn = getEl('hamburgerBtn');
+const hamburgerMenu = getEl('hamburgerMenu');
+const menuSettings = getEl('menuSettings');
 const settingsModal = getEl('settingsModal');
 const closeSettings = getEl('closeSettings');
 const authModal = getEl('authModal');
@@ -110,6 +112,9 @@ const qsModelSelect = getEl('qsModelSelect');
 const sessionList = getEl('sessionList');
 const showReasoningCheckbox = getEl('showReasoning');
 const darkThemeCheckbox = getEl('darkTheme');
+const livenessTimeoutInput = getEl('livenessTimeout');
+const livenessRow = getEl('livenessRow');
+const livenessCountdown = getEl('livenessCountdown');
 
 // Rich editor DOM elements
 const inputContainer = getEl('inputContainer');
@@ -179,8 +184,26 @@ if (sessionSearch) {
 }
 
 // Modal controls
-if (settingsBtn) {
-    settingsBtn.addEventListener('click', () => {
+// Hamburger menu toggle
+if (hamburgerBtn) {
+    hamburgerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = hamburgerMenu.style.display === 'block';
+        hamburgerMenu.style.display = isVisible ? 'none' : 'block';
+    });
+}
+
+// Close hamburger menu when clicking outside
+document.addEventListener('click', (e) => {
+    if (hamburgerMenu && !hamburgerMenu.contains(e.target) && e.target !== hamburgerBtn) {
+        hamburgerMenu.style.display = 'none';
+    }
+});
+
+// Settings menu item
+if (menuSettings) {
+    menuSettings.addEventListener('click', () => {
+        hamburgerMenu.style.display = 'none';
         settingsModal.classList.add('active');
         loadExistingSessions();
     });
@@ -583,6 +606,17 @@ if (showReasoningCheckbox) {
     });
 }
 
+if (livenessTimeoutInput) {
+    livenessTimeoutInput.addEventListener('change', (e) => {
+        const timeout = parseInt(e.target.value);
+        if (timeout >= 10 && timeout <= 300) {
+            setCookie('livenessTimeout', timeout.toString());
+        } else {
+            e.target.value = getCookie('livenessTimeout') || '30';
+        }
+    });
+}
+
 if (qsAgentSelect) {
     qsAgentSelect.addEventListener('change', (e) => {
         if (agentSelect) agentSelect.value = e.target.value;
@@ -755,16 +789,25 @@ function applyStoredPreferences() {
         document.body.classList.add('hide-reasoning');
         if (showReasoningCheckbox) showReasoningCheckbox.checked = false;
     }
+    
+    // Load liveness timeout
+    const livenessTimeout = getCookie('livenessTimeout') || '30';
+    if (livenessTimeoutInput) {
+        livenessTimeoutInput.value = livenessTimeout;
+    }
 }
 
 // Session Name Management
 function updateSessionNameDisplay() {
     const sessionNameDisplay = getEl('sessionNameDisplay');
-    if (!sessionNameDisplay || !currentSession) return;
+    if (!sessionNameDisplay) return;
     
-    const displayName = currentSession.title || `ses_${currentSession.id.slice(-8)}`;
-    sessionNameDisplay.textContent = displayName;
-    sessionNameDisplay.style.display = 'block';
+    if (currentSession) {
+        const displayName = currentSession.title || `ses_${currentSession.id.slice(-8)}`;
+        sessionNameDisplay.textContent = displayName;
+    } else {
+        sessionNameDisplay.textContent = 'No Session';
+    }
 }
 
 function showEditSessionModal() {
@@ -867,10 +910,9 @@ function handleSessionError(data) {
     const errorMessage = error.message || 'An unknown error occurred';
     const errorDetails = error.details || error.stack;
     
-    // Hide liveness timer on error
-    const livenessContainer = document.getElementById('livenessContainer');
-    if (livenessContainer) {
-        livenessContainer.style.display = 'none';
+    // Hide liveness row on error
+    if (livenessRow) {
+        livenessRow.style.display = 'none';
     }
     
     // Build error message
@@ -897,65 +939,38 @@ function handleSessionError(data) {
 function handleSessionLiveness(data) {
     const { sessionID, secondsSinceLastEvent, isStale } = data;
     
-    // Find or create timer display below the status indicator
-    let livenessContainer = document.getElementById('livenessContainer');
-    if (!livenessContainer) {
-        // Create container below status info
-        livenessContainer = document.createElement('div');
-        livenessContainer.id = 'livenessContainer';
-        livenessContainer.style.cssText = `
-            margin-top: 8px;
-            font-size: 12px;
-            display: block;
-            width: 100%;
-        `;
+    // Get liveness timeout from preferences (default 30 seconds)
+    const livenessTimeout = parseInt(getCookie('livenessTimeout') || '30');
+    
+    // Calculate countdown (timeout - elapsed time)
+    const countdown = Math.max(0, livenessTimeout - secondsSinceLastEvent);
+    
+    // Show liveness row
+    if (livenessRow) {
+        livenessRow.style.display = 'flex';
+    }
+    
+    // Update countdown display
+    if (livenessCountdown) {
+        livenessCountdown.textContent = `${countdown}s`;
         
-        // Insert inside the status-info div at the end
-        const statusInfo = document.querySelector('.status-info');
-        if (statusInfo) {
-            statusInfo.appendChild(livenessContainer);
+        // Update color based on remaining time
+        if (countdown > 10) {
+            livenessCountdown.style.color = 'var(--success-color)';
+            livenessCountdown.style.background = 'rgba(40, 167, 69, 0.1)';
+        } else if (countdown > 5) {
+            livenessCountdown.style.color = 'var(--warning-color)';
+            livenessCountdown.style.background = 'rgba(255, 193, 7, 0.1)';
+        } else {
+            livenessCountdown.style.color = 'var(--error-color)';
+            livenessCountdown.style.background = 'rgba(220, 53, 69, 0.1)';
         }
     }
-    
-    // Find or create timer element
-    let timerElement = document.getElementById('livenessTimer');
-    if (!timerElement) {
-        timerElement = document.createElement('div');
-        timerElement.id = 'livenessTimer';
-        timerElement.style.cssText = `
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-weight: 600;
-            background: #28a745;
-            color: white;
-            transition: background 0.3s ease;
-        `;
-        livenessContainer.appendChild(timerElement);
-    }
-    
-    // Update timer text and color based on time
-    timerElement.innerHTML = `⏱ Processing: ${secondsSinceLastEvent}s`;
-    
-    if (secondsSinceLastEvent < 10) {
-        timerElement.style.background = '#28a745'; // Green
-    } else if (secondsSinceLastEvent < 20) {
-        timerElement.style.background = '#ffc107'; // Yellow
-        timerElement.style.color = '#000'; // Dark text on yellow
-    } else {
-        timerElement.style.background = '#dc3545'; // Red
-        timerElement.style.color = '#fff'; // White text on red
-    }
-    
-    // Show the container
-    livenessContainer.style.display = 'flex';
     
     // Store reference
     sessionLiveness.set(sessionID, {
         seconds: secondsSinceLastEvent,
-        timerElement: timerElement,
-        container: livenessContainer
+        countdown: countdown
     });
 }
 
@@ -965,12 +980,42 @@ function handleRetryStart(data) {
     // Show retry notification
     showRetryNotification(`🔄 Retrying session (attempt ${attemptNumber || 1}) due to ${reason}...`);
     
-    // Clear liveness timer - now located in status bar
-    const liveness = sessionLiveness.get(sessionID);
-    if (liveness?.container) {
-        liveness.container.style.display = 'none';
-        sessionLiveness.delete(sessionID);
+    // Hide liveness row
+    if (livenessRow) {
+        livenessRow.style.display = 'none';
     }
+    sessionLiveness.delete(sessionID);
+}
+
+function handleRetrySuccess(data) {
+    const { sessionID } = data;
+    
+    // Hide retry notification
+    hideRetryNotification();
+    
+    // Hide liveness row
+    if (livenessRow) {
+        livenessRow.style.display = 'none';
+    }
+    
+    // Add success message
+    addMessage('system', '✅ Session retry successful!', false, false, false, true);
+}
+
+function handleRetryFailed(data) {
+    const { sessionID, error } = data;
+    
+    // Hide retry notification
+    hideRetryNotification();
+    
+    // Hide liveness row
+    if (livenessRow) {
+        livenessRow.style.display = 'none';
+    }
+    
+    // Add error message
+    addMessage('system', `❌ Session retry failed: ${error}`, true, true, false, true);
+}
 }
 
 function handleRetrySuccess(data) {
@@ -2481,12 +2526,11 @@ function connectWebSocket() {
                     addTypingIndicator('assistant-typing');
                 } else if (sessionStatus === 'idle') {
                     removeTypingIndicator('assistant-typing');
-                    // Clean up liveness timer when session becomes idle
-                    const liveness = sessionLiveness.get(sessionID);
-                    if (liveness?.timerElement) {
-                        liveness.timerElement.remove();
-                        sessionLiveness.delete(sessionID);
+                    // Hide liveness row when session becomes idle
+                    if (livenessRow) {
+                        livenessRow.style.display = 'none';
                     }
+                    sessionLiveness.delete(sessionID);
                 }
                 break;
             case 'message.delta':
@@ -2587,10 +2631,9 @@ function connectWebSocket() {
                 messageBuffer.delete(finalID);
                 removeTypingIndicator('assistant-typing');
                 
-                // Hide liveness timer when message completes
-                const livenessContainer = document.getElementById('livenessContainer');
-                if (livenessContainer) {
-                    livenessContainer.style.display = 'none';
+                // Hide liveness row when message completes
+                if (livenessRow) {
+                    livenessRow.style.display = 'none';
                 }
                 
                 // Clean up progress bubbles for this message

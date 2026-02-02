@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Liveness Timer UI Test</title>
+    <script>
+        // Quick test to verify the liveness timer appears and updates
+        async function testLiveness() {
+            const response = await fetch('http://localhost:8081/');
+            if (!response.ok) {
+                console.error('Failed to load webapp');
+                return;
+            }
+            
+            console.log('✅ Webapp is running on port 8081');
+            console.log('');
+            console.log('To test the liveness timer:');
+            console.log('1. Open http://localhost:8081 in your browser');
+            console.log('2. Send any message to start a session');
+            console.log('3. Watch for the timer to appear below the status indicator');
+            console.log('4. The timer should show "⏱ Processing: Xs" and update every second');
+            console.log('5. Color coding: Green (0-10s), Yellow (10-20s), Red (20+s)');
+            console.log('6. Timer should disappear when the message completes');
+            console.log('');
+            console.log('Manual test URL: http://localhost:8081');
+        }
+        
+        testLiveness();
+    </script>
+</head>
+<body>
+    <h1>Liveness Timer Test</h1>
+    <p>Check the console for instructions.</p>
+    <p><a href="http://localhost:8081" target="_blank">Open WebApp →</a></p>
+</body>
+</html>
