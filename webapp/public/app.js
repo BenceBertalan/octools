@@ -3332,17 +3332,8 @@ function updateStatus(status, text) {
 }
 
 function addEvent(type, data) {
-    if (!eventsContainer) return;
-    
-    // Filter out events with delta property (incremental text updates)
-    if (typeof data === 'object' && data !== null && 'delta' in data) {
-        return;
-    }
-    
-    const item = document.createElement('div');
-    item.className = 'event-item';
-    item.innerHTML = `<div class="event-header">${type}</div><div class="event-body">${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</div><div class="event-time">${new Date().toLocaleTimeString()}</div>`;
-    eventsContainer.prepend(item);
+    // Events tab removed - function deprecated but kept for compatibility
+    return;
 }
 
 function addTypingIndicator(id) {
@@ -3940,12 +3931,12 @@ async function connectToSession(session) {
     // Update session name display
     updateSessionNameDisplay();
     
-    // Reset diff drawer for new session
+    // Reset Files tab for new session
     expandedDiffs.clear();
     const diffs = sessionDiffs.get(session.id) || [];
-    updateDiffButton(diffs.length);
-    if (isDiffDrawerOpen()) {
-        renderDiffDrawer(diffs);
+    updateFilesBadge(diffs.length);
+    if (isFilesTabActive()) {
+        renderFilesTab(diffs);
     }
     
     // Clear messages container
