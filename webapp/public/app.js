@@ -24,6 +24,12 @@ const sessionDiffs = new Map(); // Map<sessionID, Array<FileDiff>>
 const expandedDiffs = new Set(); // Set<filename> for tracking expanded files
 let currentDrawerSession = null;
 
+// Rich editor state
+let editorMode = 'simple';  // 'simple' | 'rich'
+let richEditorInstance = null;
+let editRichEditorInstance = null;
+let originalMessageText = '';
+
 // Helper to get element by ID with error checking
 const getEl = (id) => {
     const el = document.getElementById(id);
@@ -60,6 +66,19 @@ const qsModelSelect = getEl('qsModelSelect');
 const sessionList = getEl('sessionList');
 const hideReasoningCheckbox = getEl('hideReasoning');
 const darkThemeCheckbox = getEl('darkTheme');
+
+// Rich editor DOM elements
+const inputContainer = getEl('inputContainer');
+const simpleInputWrapper = getEl('simpleInputWrapper');
+const richInputWrapper = getEl('richInputWrapper');
+const toggleRichBtn = getEl('toggleRichBtn');
+const toggleSimpleBtn = getEl('toggleSimpleBtn');
+const richEditor = getEl('richEditor');
+const editMessageModal = getEl('editMessageModal');
+const closeEditMessage = getEl('closeEditMessage');
+const cancelEditMessage = getEl('cancelEditMessage');
+const resendMessageBtn = getEl('resendMessageBtn');
+const editRichEditor = getEl('editRichEditor');
 
 // Tab switching (Main)
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -124,6 +143,303 @@ function showAuthError(message) {
     updateStatus('error', 'Authentication Failed');
 }
 
+// ==========================
+// Rich Editor Functions
+// ==========================
+
+// Mode Switching
+function switchToRichMode() {
+    if (editorMode === 'rich') return;
+    
+    editorMode = 'rich';
+    const simpleText = messageInput ? messageInput.value : '';
+    
+    if (simpleInputWrapper) simpleInputWrapper.style.display = 'none';
+    if (richInputWrapper) richInputWrapper.style.display = 'flex';
+    if (inputContainer) inputContainer.classList.add('rich-mode');
+    
+    if (richEditor) {
+        // Convert simple text to HTML (basic conversion)
+        richEditor.innerHTML = simpleText ? marked.parse(simpleText) : '';
+        richEditor.focus();
+    }
+}
+
+function switchToSimpleMode() {
+    if (editorMode === 'simple') return;
+    
+    editorMode = 'simple';
+    const richHTML = richEditor ? richEditor.innerHTML : '';
+    
+    if (richInputWrapper) richInputWrapper.style.display = 'none';
+    if (simpleInputWrapper) simpleInputWrapper.style.display = 'flex';
+    if (inputContainer) inputContainer.classList.remove('rich-mode');
+    
+    if (messageInput) {
+        // Convert HTML to Markdown
+        messageInput.value = htmlToMarkdown(richHTML);
+        messageInput.focus();
+        // Trigger resize
+        messageInput.style.height = 'auto';
+        messageInput.style.height = messageInput.scrollHeight + 'px';
+    }
+}
+
+// HTML to Markdown Converter
+function htmlToMarkdown(html) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    return nodeToMarkdown(tempDiv);
+}
+
+function nodeToMarkdown(node) {
+    let markdown = '';
+    
+    for (let child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+            markdown += child.textContent;
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const tag = child.tagName.toLowerCase();
+            const content = nodeToMarkdown(child);
+            
+            switch (tag) {
+                case 'strong':
+                case 'b':
+                    markdown += `**${content}**`;
+                    break;
+                case 'em':
+                case 'i':
+                    markdown += `*${content}*`;
+                    break;
+                case 'code':
+                    markdown += `\`${content}\``;
+                    break;
+                case 'pre':
+                    const codeContent = child.querySelector('code');
+                    markdown += `\n\`\`\`\n${codeContent ? codeContent.textContent : content}\n\`\`\`\n`;
+                    break;
+                case 'h1':
+                    markdown += `\n# ${content}\n`;
+                    break;
+                case 'h2':
+                    markdown += `\n## ${content}\n`;
+                    break;
+                case 'h3':
+                    markdown += `\n### ${content}\n`;
+                    break;
+                case 'ul':
+                    markdown += '\n' + Array.from(child.children).map(li => `- ${nodeToMarkdown(li)}`).join('\n') + '\n';
+                    break;
+                case 'ol':
+                    markdown += '\n' + Array.from(child.children).map((li, i) => `${i+1}. ${nodeToMarkdown(li)}`).join('\n') + '\n';
+                    break;
+                case 'li':
+                    markdown += content;
+                    break;
+                case 'br':
+                    markdown += '\n';
+                    break;
+                case 'p':
+                    markdown += content + '\n';
+                    break;
+                default:
+                    markdown += content;
+            }
+        }
+    }
+    
+    return markdown;
+}
+
+// Get content from active editor
+function getEditorContent() {
+    if (editorMode === 'rich' && richEditor) {
+        return htmlToMarkdown(richEditor.innerHTML).trim();
+    } else if (messageInput) {
+        return messageInput.value.trim();
+    }
+    return '';
+}
+
+// Clear active editor
+function clearEditorContent() {
+    if (editorMode === 'rich' && richEditor) {
+        richEditor.innerHTML = '';
+    } else if (messageInput) {
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+    }
+}
+
+// Formatting Functions
+function applyRichFormat(format, editor) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    switch (format) {
+        case 'bold':
+            document.execCommand('bold', false, null);
+            break;
+        case 'italic':
+            document.execCommand('italic', false, null);
+            break;
+        case 'code':
+            insertMarkdownCode(range, editor);
+            break;
+        case 'codeblock':
+            insertCodeBlock(range, editor);
+            break;
+        case 'heading':
+            insertHeading(range, editor);
+            break;
+        case 'list':
+            document.execCommand('insertUnorderedList', false, null);
+            break;
+        case 'indent':
+            document.execCommand('indent', false, null);
+            break;
+        case 'outdent':
+            document.execCommand('outdent', false, null);
+            break;
+    }
+    
+    editor.focus();
+}
+
+function insertMarkdownCode(range, editor) {
+    const selectedText = range.toString();
+    const codeEl = document.createElement('code');
+    codeEl.textContent = selectedText || 'code';
+    
+    range.deleteContents();
+    range.insertNode(codeEl);
+    
+    // Move cursor after the code element
+    range.setStartAfter(codeEl);
+    range.setEndAfter(codeEl);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+}
+
+function insertCodeBlock(range, editor) {
+    const selectedText = range.toString();
+    const preEl = document.createElement('pre');
+    const codeEl = document.createElement('code');
+    codeEl.textContent = selectedText || 'code block';
+    preEl.appendChild(codeEl);
+    
+    range.deleteContents();
+    range.insertNode(preEl);
+    
+    // Move cursor after the pre element
+    range.setStartAfter(preEl);
+    range.setEndAfter(preEl);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+}
+
+function insertHeading(range, editor) {
+    const selectedText = range.toString();
+    const h2El = document.createElement('h2');
+    h2El.textContent = selectedText || 'Heading';
+    
+    range.deleteContents();
+    range.insertNode(h2El);
+    
+    // Move cursor after the heading
+    range.setStartAfter(h2El);
+    range.setEndAfter(h2El);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+}
+
+// Toolbar Initialization
+function initMainToolbar() {
+    const toolbar = document.getElementById('markdownToolbar');
+    if (!toolbar) return;
+    
+    toolbar.querySelectorAll('.md-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const format = btn.dataset.format;
+            applyRichFormat(format, richEditor);
+        });
+    });
+}
+
+function initEditToolbar() {
+    const toolbar = document.getElementById('editMarkdownToolbar');
+    if (!toolbar) return;
+    
+    toolbar.querySelectorAll('.md-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const format = btn.dataset.format;
+            applyRichFormat(format, editRichEditor);
+        });
+    });
+}
+
+// Edit & Resend Functions
+function addEditButton(bubble, messageText) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'edit-message-btn';
+    editBtn.textContent = '✏️ Edit & Send';
+    editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showEditMessageModal(messageText);
+    });
+    bubble.appendChild(editBtn);
+}
+
+function showEditMessageModal(messageText) {
+    originalMessageText = messageText;
+    
+    if (editRichEditor) {
+        // Convert markdown to HTML for editing
+        editRichEditor.innerHTML = marked.parse(messageText);
+    }
+    
+    if (editMessageModal) {
+        editMessageModal.classList.add('active');
+    }
+}
+
+function hideEditMessageModal() {
+    if (editMessageModal) {
+        editMessageModal.classList.remove('active');
+    }
+    if (editRichEditor) {
+        editRichEditor.innerHTML = '';
+    }
+    originalMessageText = '';
+}
+
+function resendEditedMessage() {
+    const editedContent = editRichEditor ? htmlToMarkdown(editRichEditor.innerHTML).trim() : '';
+    
+    if (!editedContent) {
+        alert('Message cannot be empty');
+        return;
+    }
+    
+    hideEditMessageModal();
+    
+    // Send as new message using current settings
+    const message = {
+        role: 'user',
+        content: editedContent
+    };
+    
+    // Get current settings from quick settings
+    const currentAgent = qsAgentSelect ? qsAgentSelect.value : '';
+    const currentModel = qsModelSelect ? qsModelSelect.value : '';
+    
+    sendMessage(editedContent, currentAgent, currentModel);
+}
+
 // Auto-resize textarea
 if (messageInput) {
     messageInput.addEventListener('input', () => {
@@ -140,7 +456,7 @@ if (refreshLogsBtn) refreshLogsBtn.addEventListener('click', fetchLogs);
 
 if (messageInput) {
     messageInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (editorMode === 'simple' && e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
         }
@@ -249,6 +565,72 @@ if (sessionNameInput) {
             saveSessionName();
         } else if (e.key === 'Escape') {
             hideEditSessionModal();
+        }
+    });
+}
+
+// Close modal on backdrop click
+if (editSessionModal) {
+    editSessionModal.addEventListener('click', (e) => {
+        if (e.target === editSessionModal) {
+            hideEditSessionModal();
+        }
+    });
+}
+
+// ==========================
+// Rich Editor Event Listeners
+// ==========================
+
+// Mode toggle buttons
+if (toggleRichBtn) {
+    toggleRichBtn.addEventListener('click', switchToRichMode);
+}
+
+if (toggleSimpleBtn) {
+    toggleSimpleBtn.addEventListener('click', switchToSimpleMode);
+}
+
+// Edit message modal controls
+if (closeEditMessage) {
+    closeEditMessage.addEventListener('click', hideEditMessageModal);
+}
+
+if (cancelEditMessage) {
+    cancelEditMessage.addEventListener('click', hideEditMessageModal);
+}
+
+if (resendMessageBtn) {
+    resendMessageBtn.addEventListener('click', resendEditedMessage);
+}
+
+// Close edit modal on backdrop click
+if (editMessageModal) {
+    editMessageModal.addEventListener('click', (e) => {
+        if (e.target === editMessageModal) {
+            hideEditMessageModal();
+        }
+    });
+}
+
+// Initialize toolbars
+initMainToolbar();
+initEditToolbar();
+
+// Rich editor input handling
+if (richEditor) {
+    richEditor.addEventListener('input', () => {
+        const hasContent = richEditor.textContent.trim().length > 0;
+        if (sendBtn) sendBtn.disabled = !hasContent;
+    });
+}
+
+// Update send button state based on simple input
+if (messageInput) {
+    messageInput.addEventListener('input', () => {
+        if (editorMode === 'simple') {
+            const hasContent = messageInput.value.trim().length > 0;
+            if (sendBtn) sendBtn.disabled = !hasContent;
         }
     });
 }
@@ -927,22 +1309,21 @@ function clearSessionDiffs() {
     renderDiffDrawer([]);
 }
 
-async function sendMessage() {
+async function sendMessage(customText = null, customAgent = null, customModel = null) {
     if (!currentSession) {
         alert('Please connect to a session first');
         if (settingsModal) settingsModal.classList.add('active');
         return;
     }
     
-    const text = messageInput.value.trim();
+    const text = customText || getEditorContent();
     if (!text) return;
 
-    messageInput.value = '';
-    messageInput.style.height = 'auto';
+    clearEditorContent();
     if (sendBtn) sendBtn.disabled = true;
     
-    const agent = qsAgentSelect ? qsAgentSelect.value : undefined;
-    const modelStr = qsModelSelect ? qsModelSelect.value : undefined;
+    const agent = customAgent !== null ? customAgent : (qsAgentSelect ? qsAgentSelect.value : undefined);
+    const modelStr = customModel !== null ? customModel : (qsModelSelect ? qsModelSelect.value : undefined);
     const model = (modelStr && modelStr !== "") ? JSON.parse(modelStr) : undefined;
 
     addMessage('user', text, false, false, false, false, { agent, modelID: model?.modelID, providerID: model?.providerID });
@@ -1037,6 +1418,11 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
         content.textContent = text;
     }
     bubble.appendChild(content);
+
+    // Add edit button for user messages
+    if (role === 'user') {
+        addEditButton(bubble, text);
+    }
 
     if (isQuestion) {
         bubble.classList.add('question-inline');

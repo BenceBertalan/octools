@@ -71,12 +71,39 @@
                 </div>
             </div>
             
-            <div class="input-container">
-                <textarea 
-                    id="messageInput" 
-                    placeholder="Type a message..." 
-                    rows="1"
-                ></textarea>
+            <div class="input-container" id="inputContainer">
+                <!-- Simple Mode Input -->
+                <div class="simple-input-wrapper" id="simpleInputWrapper">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="Type a message..." 
+                        rows="1"
+                    ></textarea>
+                    <button id="toggleRichBtn" class="toggle-rich-btn" title="Switch to Rich Editor">📝</button>
+                </div>
+
+                <!-- Rich Mode Input -->
+                <div class="rich-input-wrapper" id="richInputWrapper" style="display: none;">
+                    <div class="markdown-toolbar" id="markdownToolbar">
+                        <button class="md-btn" data-format="bold" title="Bold">B</button>
+                        <button class="md-btn" data-format="italic" title="Italic">I</button>
+                        <button class="md-btn" data-format="code" title="Inline Code">C</button>
+                        <button class="md-btn" data-format="codeblock" title="Code Block">`</button>
+                        <button class="md-btn" data-format="heading" title="Heading">#</button>
+                        <button class="md-btn" data-format="list" title="List">L</button>
+                        <button class="md-btn" data-format="indent" title="Increase Indent">→</button>
+                        <button class="md-btn" data-format="outdent" title="Decrease Indent">←</button>
+                        <div class="toolbar-spacer"></div>
+                        <button id="toggleSimpleBtn" class="toggle-simple-btn">💾 Simple</button>
+                    </div>
+                    <div 
+                        id="richEditor" 
+                        class="rich-editor" 
+                        contenteditable="true" 
+                        data-placeholder="Type a message with formatting..."
+                    ></div>
+                </div>
+
                 <button id="abortBtn" title="Abort" style="background: var(--error-color); display: none;">🛑</button>
                 <button id="sendBtn" disabled>➤</button>
             </div>
@@ -194,6 +221,40 @@
                 <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                     <button class="btn-secondary" id="cancelEditSession">Cancel</button>
                     <button class="btn-primary" id="saveSessionName">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Message Modal -->
+    <div class="modal" id="editMessageModal">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3>Edit & Resend Message</h3>
+                <button class="close-btn" id="closeEditMessage">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="markdown-toolbar" id="editMarkdownToolbar">
+                    <button class="md-btn" data-format="bold" title="Bold">B</button>
+                    <button class="md-btn" data-format="italic" title="Italic">I</button>
+                    <button class="md-btn" data-format="code" title="Inline Code">C</button>
+                    <button class="md-btn" data-format="codeblock" title="Code Block">`</button>
+                    <button class="md-btn" data-format="heading" title="Heading">#</button>
+                    <button class="md-btn" data-format="list" title="List">L</button>
+                    <button class="md-btn" data-format="indent" title="Increase Indent">→</button>
+                    <button class="md-btn" data-format="outdent" title="Decrease Indent">←</button>
+                </div>
+                <div 
+                    id="editRichEditor" 
+                    class="rich-editor edit-rich-editor" 
+                    contenteditable="true"
+                ></div>
+                <div class="edit-warning">
+                    ⚠️ This will send as a new message with your edits
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+                    <button class="btn-secondary" id="cancelEditMessage">Cancel</button>
+                    <button class="btn-primary" id="resendMessageBtn">Resend Message</button>
                 </div>
             </div>
         </div>

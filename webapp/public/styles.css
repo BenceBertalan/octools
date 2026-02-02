@@ -437,6 +437,19 @@ body.dark .option-item-inline {
     display: flex;
     gap: 12px;
     align-items: flex-end;
+    transition: all 0.3s ease;
+}
+
+.input-container.rich-mode {
+    align-items: stretch;
+}
+
+/* Simple Input Wrapper */
+.simple-input-wrapper {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
 }
 
 #messageInput {
@@ -450,6 +463,242 @@ body.dark .option-item-inline {
     font-size: 15px;
     outline: none;
     background: #f0f2f5;
+}
+
+/* Rich Input Wrapper */
+.rich-input-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Toggle Rich Button */
+.toggle-rich-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: #f0f2f5;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.toggle-rich-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    transform: scale(1.05);
+}
+
+/* Markdown Toolbar */
+.markdown-toolbar {
+    display: flex;
+    gap: 4px;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    align-items: center;
+}
+
+.md-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    color: var(--text-color);
+}
+
+.md-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: scale(1.05);
+}
+
+.md-btn:active {
+    transform: scale(0.95);
+}
+
+.toolbar-spacer {
+    flex: 1;
+}
+
+.toggle-simple-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.toggle-simple-btn:hover {
+    background: #0073e6;
+    transform: scale(1.05);
+}
+
+/* Rich Editor (ContentEditable) */
+.rich-editor {
+    min-height: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: white;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    outline: none;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.rich-editor:empty:before {
+    content: attr(data-placeholder);
+    color: #999;
+    pointer-events: none;
+}
+
+/* Edit Rich Editor (Modal version) */
+.edit-rich-editor {
+    min-height: 300px;
+    max-height: 400px;
+}
+
+/* Markdown Elements in Rich Editor */
+.rich-editor strong {
+    font-weight: bold;
+}
+
+.rich-editor em {
+    font-style: italic;
+}
+
+.rich-editor code {
+    background: #f0f2f5;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+.rich-editor pre {
+    background: #f6f8fa;
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.rich-editor pre code {
+    background: none;
+    padding: 0;
+}
+
+.rich-editor h1, .rich-editor h2, .rich-editor h3 {
+    font-weight: bold;
+    margin: 8px 0;
+}
+
+.rich-editor h1 { font-size: 24px; }
+.rich-editor h2 { font-size: 20px; }
+.rich-editor h3 { font-size: 18px; }
+
+.rich-editor ul, .rich-editor ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.rich-editor li {
+    margin: 4px 0;
+}
+
+.rich-editor a {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+/* Edit Message Modal */
+.modal-wide {
+    max-width: 700px;
+}
+
+.edit-warning {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #856404;
+    text-align: center;
+    margin-top: 12px;
+}
+
+/* Edit Button on Messages */
+.edit-message-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.message-bubble.user {
+    position: relative;
+}
+
+.message-bubble.user:hover .edit-message-btn {
+    opacity: 1;
+}
+
+.edit-message-btn:hover {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.btn-secondary {
+    background: #e4e6eb;
+    color: var(--text-color);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.btn-secondary:hover {
+    background: #d0d2d7;
+}
+
+.btn-secondary:active {
+    transform: scale(0.98);
 }
 
 #sendBtn, #abortBtn {
@@ -767,6 +1016,73 @@ body.dark .form-group input, body.dark #sessionSearch, body.dark .qs-item select
 body.dark .session-item:hover { background: #3a3b3c; }
 body.dark .event-item { background: #242526; border-color: #3e4042; }
 body.dark .session-group-header { background: rgba(255, 255, 255, 0.02); }
+
+/* Dark Mode for Rich Editor */
+body.dark .toggle-rich-btn {
+    background: #3a3b3c;
+    border-color: #4e4f50;
+    color: #e4e6eb;
+}
+
+body.dark .toggle-rich-btn:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+body.dark .markdown-toolbar {
+    background: #2c2c2e;
+    border-color: #4e4f50;
+}
+
+body.dark .md-btn {
+    background: #3a3b3c;
+    border-color: #4e4f50;
+    color: #e4e6eb;
+}
+
+body.dark .md-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+body.dark .toggle-simple-btn {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+body.dark .rich-editor {
+    background: #3a3b3c;
+    border-color: #4e4f50;
+    color: #e4e6eb;
+}
+
+body.dark .rich-editor:empty:before {
+    color: #777;
+}
+
+body.dark .rich-editor code {
+    background: #2c2c2e;
+}
+
+body.dark .rich-editor pre {
+    background: #2c2c2e;
+}
+
+body.dark .edit-warning {
+    background: #4a3f00;
+    border-color: #ffb74d;
+    color: #ffe0b2;
+}
+
+body.dark .btn-secondary {
+    background: #3a3b3c;
+    color: #e4e6eb;
+}
+
+body.dark .btn-secondary:hover {
+    background: #4e4f50;
+}
 
 /* Utils */
 .message-bubble.error { background: #fff0f0; color: #d32f2f; align-self: center; text-align: center; margin: 10px 0; border: 1px solid #ffcdd2; border-radius: 8px; }
@@ -1236,6 +1552,36 @@ body.dark .diff-line-context {
         right: 10px;
         top: 60px;
         min-width: auto;
+    }
+
+    /* Rich Editor Mobile */
+    .markdown-toolbar {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .md-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .toggle-simple-btn {
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+
+    .rich-editor {
+        min-height: 150px;
+        max-height: 250px;
+    }
+
+    .edit-rich-editor {
+        min-height: 200px;
+        max-height: 300px;
+    }
+
+    .modal-wide {
+        max-width: 95%;
     }
 }
 
