@@ -2891,6 +2891,10 @@ async function connectToSession(session) {
         if (loadingStats) loadingStats.textContent = `${messagesToShow.length} messages`;
         if (progressFill) progressFill.style.width = '40%';
         
+        // Temporarily cache the recent messages (will be replaced by full cache)
+        messagesCache.set(session.id, messagesToShow);
+        oldestDisplayedIndex.set(session.id, 0);
+        
         // Subscribe to WebSocket updates
         if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
         updateStatus('idle'); 
@@ -2944,6 +2948,7 @@ async function connectToSession(session) {
         }, 300);
         
         // STAGE 2: Fetch ALL messages in background and cache them
+        const displayedCount = messagesToShow.length; // Capture this before async
         console.log('[UI] Starting background fetch of all messages...');
         fetch(`/api/session/${session.id}/messages`)
             .then(async (response) => {
@@ -2955,7 +2960,6 @@ async function connectToSession(session) {
                 messagesCache.set(session.id, allMessages);
                 
                 // Calculate how many messages are already displayed
-                const displayedCount = messagesToShow.length;
                 const startIndex = allMessages.length - displayedCount;
                 
                 // Store oldest displayed index
@@ -2963,8 +2967,10 @@ async function connectToSession(session) {
                 
                 // Add "Load More" button if there are older messages
                 if (startIndex > 0) {
-                    console.log(`[UI] ${startIndex} older messages available`);
+                    console.log(`[UI] ${startIndex} older messages available (displayed ${displayedCount} of ${allMessages.length})`);
                     updateLoadMoreButton(false, true);
+                } else {
+                    console.log(`[UI] All messages displayed (${displayedCount} total)`);
                 }
             })
             .catch(e => {
