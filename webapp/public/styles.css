@@ -813,29 +813,9 @@ body.dark .option-item-inline {
 
 .qs-item select { width: auto; max-width: 150px; padding: 6px 10px; }
 
-/* Quick Settings Send Button */
-.qs-send-btn {
-    padding: 8px 16px;
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 14px;
+/* Quick Settings area styling for send button */
+.quick-settings #sendBtn {
     margin-left: auto;
-}
-
-.qs-send-btn:hover:not(:disabled) {
-    filter: brightness(1.1);
-    transform: scale(1.05);
-}
-
-.qs-send-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    transform: none;
 }
 
 /* Toggle Labels in Preferences */
@@ -884,11 +864,7 @@ body.dark .option-item-inline {
     font-size: 14px;
 }
 
-/* Dark mode for toggles and send button */
-body.dark .qs-send-btn:disabled {
-    background: #4e4f50;
-}
-
+/* Dark mode for toggles */
 body.dark .toggle-label input[type="checkbox"] {
     background: #4e4f50;
 }

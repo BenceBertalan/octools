@@ -66,7 +66,6 @@ const qsModelSelect = getEl('qsModelSelect');
 const sessionList = getEl('sessionList');
 const showReasoningCheckbox = getEl('showReasoning');
 const darkThemeCheckbox = getEl('darkTheme');
-const qsSendBtn = getEl('qsSendBtn');
 
 // Rich editor DOM elements
 const inputContainer = getEl('inputContainer');
@@ -453,7 +452,6 @@ if (messageInput) {
         messageInput.style.height = messageInput.scrollHeight + 'px';
         const hasContent = messageInput.value.trim().length > 0;
         if (sendBtn) sendBtn.disabled = !hasContent;
-        if (qsSendBtn) qsSendBtn.disabled = !hasContent;
     });
 }
 
@@ -505,11 +503,6 @@ if (showReasoningCheckbox) {
         document.body.classList.toggle('hide-reasoning', !e.target.checked);
         setCookie('showReasoning', e.target.checked ? 'true' : 'false');
     });
-}
-
-// Quick Settings Send Button
-if (qsSendBtn) {
-    qsSendBtn.addEventListener('click', sendMessage);
 }
 
 if (qsAgentSelect) {
@@ -637,7 +630,6 @@ if (richEditor) {
     richEditor.addEventListener('input', () => {
         const hasContent = richEditor.textContent.trim().length > 0;
         if (sendBtn) sendBtn.disabled = !hasContent;
-        if (qsSendBtn) qsSendBtn.disabled = !hasContent;
     });
 }
 
@@ -647,7 +639,6 @@ if (messageInput) {
         if (editorMode === 'simple') {
             const hasContent = messageInput.value.trim().length > 0;
             if (sendBtn) sendBtn.disabled = !hasContent;
-            if (qsSendBtn) qsSendBtn.disabled = !hasContent;
         }
     });
 }
@@ -1351,7 +1342,6 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
 
     clearEditorContent();
     if (sendBtn) sendBtn.disabled = true;
-    if (qsSendBtn) qsSendBtn.disabled = true;
     
     const agent = customAgent !== null ? customAgent : (qsAgentSelect ? qsAgentSelect.value : undefined);
     const modelStr = customModel !== null ? customModel : (qsModelSelect ? qsModelSelect.value : undefined);
@@ -1382,7 +1372,6 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
         alert('Failed to send message: ' + error.message);
     } finally {
         if (sendBtn) sendBtn.disabled = false;
-        if (qsSendBtn) qsSendBtn.disabled = false;
     }
 }
 
