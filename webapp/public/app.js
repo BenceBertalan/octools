@@ -33,6 +33,26 @@ let richEditorInstance = null;
 let editRichEditorInstance = null;
 let originalMessageText = '';
 
+// Post-process marked.js output to fix list spacing issues
+function cleanMarkedOutput(html) {
+    if (!html) return html;
+    
+    // Remove newlines between list items to prevent spacing issues
+    // This makes marked.js output similar to our custom function
+    html = html.replace(/(<\/li>)\s*\n\s*(<li>)/g, '$1$2');
+    
+    // Remove newlines after opening <ul>/<ol> and before closing
+    html = html.replace(/(<[uo]l>)\s*\n\s*/g, '$1');
+    html = html.replace(/\s*\n\s*(<\/[uo]l>)/g, '$1');
+    
+    // Remove any remaining newlines within lists
+    html = html.replace(/(<[uo]l>[\s\S]*?<\/[uo]l>)/g, function(match) {
+        return match.replace(/\n/g, '');
+    });
+    
+    return html;
+}
+
 // Helper to get element by ID with error checking
 const getEl = (id) => {
     const el = document.getElementById(id);
@@ -168,7 +188,7 @@ function switchToRichMode() {
     
     if (richEditor) {
         // Show selectively formatted markdown (code blocks & headings only)
-        richEditor.innerHTML = typeof marked !== 'undefined' ? marked.parse(simpleText || '') : (simpleText || '');
+        richEditor.innerHTML = typeof marked !== 'undefined' ? cleanMarkedOutput(marked.parse(simpleText || '')) : (simpleText || '');
         richEditor.focus();
     }
 }
@@ -407,7 +427,7 @@ function showEditMessageModal(messageText) {
     
     if (editRichEditor) {
         // Show selectively formatted markdown (code blocks & headings only)
-        editRichEditor.innerHTML = typeof marked !== 'undefined' ? marked.parse(messageText) : messageText;
+        editRichEditor.innerHTML = typeof marked !== 'undefined' ? cleanMarkedOutput(marked.parse(messageText)) : messageText;
     }
     
     if (editMessageModal) {
@@ -844,7 +864,7 @@ function createReasoningSection(reasoningParts, messageID) {
     content.className = 'reasoning-content' + (isExpanded ? ' expanded' : '');
     
     // Show selectively formatted markdown (code blocks & headings only)
-    content.innerHTML = typeof marked !== 'undefined' ? marked.parse(reasoningText) : reasoningText;
+    content.innerHTML = typeof marked !== 'undefined' ? cleanMarkedOutput(marked.parse(reasoningText)) : reasoningText;
     
     toggle.onclick = (e) => {
         e.stopPropagation();
@@ -998,7 +1018,7 @@ async function loadMoreMessages() {
             const content = document.createElement('div');
             content.className = 'message-content';
             // Show selectively formatted markdown (code blocks & headings only)
-            content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+            content.innerHTML = typeof marked !== 'undefined' ? cleanMarkedOutput(marked.parse(text)) : text;
             bubble.appendChild(content);
             
             if (msg.info.error) bubble.classList.add('error');
@@ -1446,7 +1466,7 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
     }
     
     const content = streamMsg.querySelector('.message-content') || streamMsg;
-    content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+    content.innerHTML = typeof marked !== 'undefined' ? cleanMarkedOutput(marked.parse(text)) : text;
     if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -1477,7 +1497,7 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     const content = document.createElement('div');
     content.className = 'message-content';
     // Show selectively formatted markdown (code blocks & headings only)
-    content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+    content.innerHTML = typeof marked !== 'undefined' ? cleanMarkedOutput(marked.parse(text)) : text;
     bubble.appendChild(content);
 
     // Add edit button for user messages

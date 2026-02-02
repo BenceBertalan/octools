@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Cleaned Marked Output</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            background: #f5f5f5;
+        }
+        .output {
+            background: white;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 5px;
+            overflow-x: auto;
+        }
+        
+        /* Webapp styles */
+        .message-content ul, .message-content ol {
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+        
+        .message-content li {
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Testing cleanMarkedOutput Function</h1>
+    
+    <script>
+        // The cleaning function from app.js
+        function cleanMarkedOutput(html) {
+            if (!html) return html;
+            
+            // Remove newlines between list items to prevent spacing issues
+            html = html.replace(/(<\/li>)\s*\n\s*(<li>)/g, '$1$2');
+            
+            // Remove newlines after opening <ul>/<ol> and before closing
+            html = html.replace(/(<[uo]l>)\s*\n\s*/g, '$1');
+            html = html.replace(/\s*\n\s*(<\/[uo]l>)/g, '$1');
+            
+            // Remove any remaining newlines within lists
+            html = html.replace(/(<[uo]l>[\s\S]*?<\/[uo]l>)/g, function(match) {
+                return match.replace(/\n/g, '');
+            });
+            
+            return html;
+        }
+        
+        const testInput = `Here's a test with lists:
+
+- First item
+- Second item
+- Third item
+
+Some text between lists.
+
+1. Numbered one
+2. Numbered two
+3. Numbered three
+
+Mixed content:
+- Item with **bold**
+- Item with \`code\`
+- Item with *italic*
+
+After the list.`;
+        
+        // Test marked.js alone
+        const markedOutput = marked.parse(testInput);
+        
+        // Test marked.js with cleaning
+        const cleanedOutput = cleanMarkedOutput(markedOutput);
+        
+        document.write('<div class="test-section">');
+        document.write('<h2>Original marked.js Output</h2>');
+        document.write('<div class="output message-content">' + markedOutput + '</div>');
+        document.write('<h3>Raw HTML:</h3>');
+        document.write('<pre>' + markedOutput.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>');
+        document.write('</div>');
+        
+        document.write('<div class="test-section">');
+        document.write('<h2>Cleaned Output (with cleanMarkedOutput)</h2>');
+        document.write('<div class="output message-content">' + cleanedOutput + '</div>');
+        document.write('<h3>Raw HTML:</h3>');
+        document.write('<pre>' + cleanedOutput.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>');
+        document.write('</div>');
+        
+        // Analysis
+        document.write('<div class="test-section">');
+        document.write('<h2>Analysis</h2>');
+        document.write('<p><strong>Original newlines in lists:</strong> ' + 
+            (markedOutput.match(/(<\/li>)\s*\n\s*(<li>)/g) || []).length + '</p>');
+        document.write('<p><strong>Cleaned newlines in lists:</strong> ' + 
+            (cleanedOutput.match(/(<\/li>)\s*\n\s*(<li>)/g) || []).length + '</p>');
+        document.write('<p><strong>Original total newlines:</strong> ' + 
+            (markedOutput.match(/\n/g) || []).length + '</p>');
+        document.write('<p><strong>Cleaned total newlines:</strong> ' + 
+            (cleanedOutput.match(/\n/g) || []).length + '</p>');
+        document.write('</div>');
+    </script>
+</body>
+</html>

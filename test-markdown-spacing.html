@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Markdown Spacing Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ccc;
+            padding: 15px;
+            background: #f5f5f5;
+        }
+        .panel h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .output {
+            background: white;
+            padding: 10px;
+            border: 1px solid #ddd;
+            min-height: 200px;
+        }
+        .raw-html {
+            background: #f0f0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        /* Current webapp styles */
+        .message-content ul, .message-content ol {
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+        
+        .message-content li {
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
+        }
+        
+        /* Attempt to hide br tags */
+        .message-content ul br,
+        .message-content ol br,
+        .message-content li br {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <h1>Markdown Rendering Comparison</h1>
+    
+    <div style="margin-bottom: 20px;">
+        <h3>Test Input (Markdown):</h3>
+        <textarea id="testInput" rows="10" style="width: 100%; font-family: monospace;">
+Here's a test with lists:
+
+- First item
+- Second item
+- Third item
+
+1. Numbered one
+2. Numbered two
+3. Numbered three
+
+Mixed content:
+- Item with **bold**
+- Item with `code`
+- Item with *italic*
+
+After the list.
+        </textarea>
+        <button onclick="runTest()">Run Test</button>
+    </div>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>marked.js Output</h2>
+            <div class="output message-content" id="markedOutput"></div>
+            <div class="raw-html" id="markedRaw"></div>
+        </div>
+        
+        <div class="panel">
+            <h2>Custom Function Output</h2>
+            <div class="output message-content" id="customOutput"></div>
+            <div class="raw-html" id="customRaw"></div>
+        </div>
+        
+        <div class="panel">
+            <h2>marked.js with Post-Processing</h2>
+            <div class="output message-content" id="postProcessOutput"></div>
+            <div class="raw-html" id="postProcessRaw"></div>
+        </div>
+    </div>
+    
+    <script>
+        function formatSelectiveMarkdown(text) {
+            if (!text) return text;
+            
+            let html = text;
+            
+            // Escape HTML to prevent injection
+            html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            // Format code blocks (```language\ncode\n```) - MUST come before inline code
+            html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, function(match, lang, code) {
+                return '<pre><code class="language-' + (lang || 'text') + '">' + code.trim() + '</code></pre>';
+            });
+            
+            // Format inline code (`code`) - MUST come before bold/italic to avoid conflicts
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Format bold + italic (***text*** or ___text___)
+            html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+            html = html.replace(/___(.+?)___/g, '<strong><em>$1</em></strong>');
+            
+            // Format bold (**text** or __text__)
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+            
+            // Format italic (*text* or _text_) - be careful not to match list markers
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+            
+            // Format headings (# Heading)
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            
+            // Format unordered lists (-, *, +)
+            // Match lines starting with -, *, or + followed by space
+            html = html.replace(/^([*\-+]) (.+)$/gm, '<li>$2</li>');
+            
+            // Format ordered lists (1., 2., etc.)
+            html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+            
+            // Wrap consecutive <li> tags in <ul> or <ol>
+            // This handles unordered lists
+            html = html.replace(/(<li>.*?<\/li>\n?)+/g, function(match) {
+                // Remove newlines inside the list to prevent <br> tags between items
+                return '<ul>' + match.replace(/\n/g, '') + '</ul>';
+            });
+            
+            // Convert newlines to <br> for display
+            html = html.replace(/\n/g, '<br>');
+            
+            return html;
+        }
+        
+        function postProcessMarkedHTML(html) {
+            // Remove <p> tags inside <li> elements
+            html = html.replace(/<li>\s*<p>(.*?)<\/p>\s*<\/li>/g, '<li>$1</li>');
+            
+            // Remove empty paragraphs
+            html = html.replace(/<p>\s*<\/p>/g, '');
+            
+            // Remove newlines between list items
+            html = html.replace(/<\/li>\s*\n\s*<li>/g, '</li><li>');
+            
+            return html;
+        }
+        
+        function escapeHtml(html) {
+            return html.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
+        
+        function runTest() {
+            const input = document.getElementById('testInput').value;
+            
+            // Test marked.js
+            const markedHTML = marked.parse(input);
+            document.getElementById('markedOutput').innerHTML = markedHTML;
+            document.getElementById('markedRaw').textContent = markedHTML;
+            
+            // Test custom function
+            const customHTML = formatSelectiveMarkdown(input);
+            document.getElementById('customOutput').innerHTML = customHTML;
+            document.getElementById('customRaw').textContent = customHTML;
+            
+            // Test marked with post-processing
+            const postHTML = postProcessMarkedHTML(markedHTML);
+            document.getElementById('postProcessOutput').innerHTML = postHTML;
+            document.getElementById('postProcessRaw').textContent = postHTML;
+        }
+        
+        // Run test on page load
+        window.onload = function() {
+            runTest();
+        };
+    </script>
+</body>
+</html>
