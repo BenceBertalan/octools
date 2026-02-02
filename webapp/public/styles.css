@@ -164,11 +164,15 @@ body {
     max-width: 75%;
     padding: 10px 14px;
     border-radius: 18px;
-    word-wrap: break-word;
     font-size: 15px;
     line-height: 1.4;
     position: relative;
     margin-bottom: 4px;
+    /* Enhanced word wrapping to prevent overflow */
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    overflow: hidden;
 }
 
 .message-bubble.user {
@@ -304,6 +308,33 @@ body.dark .option-item-inline {
     font-size: 11px;
     color: #65676b;
     margin-top: 4px;
+}
+
+/* Message content overflow fixes */
+.message-content {
+    width: 100%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Fix for code blocks and inline code in markdown */
+.message-bubble pre,
+.message-bubble code {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+}
+
+.message-bubble pre {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+/* Fix for URLs and long strings */
+.message-bubble a {
+    word-break: break-all;
+    overflow-wrap: anywhere;
 }
 
 /* Typing Indicator */
