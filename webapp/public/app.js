@@ -3718,7 +3718,7 @@ async function loadAgentsAndModels() {
                     select.appendChild(group);
                 });
             } else {
-                items.forEach(a => { const opt = document.createElement('option'); opt.value = a; opt.textContent = a; select.appendChild(opt); });
+                items.forEach(a => { const opt = document.createElement('option'); opt.value = a.name; opt.textContent = a.name; select.appendChild(opt); });
             }
         };
         populateSelect(agentSelect, agents, 'Default Agent');
