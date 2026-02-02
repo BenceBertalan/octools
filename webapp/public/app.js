@@ -1274,12 +1274,27 @@ async function loadMoreMessages() {
             bubble.className = `message-bubble ${msg.info.role}`;
             bubble.id = 'msg-' + msgID;
             
-            if (msg.info.agent || msg.info.modelID) {
+            if (msg.info.agent || msg.info.modelID || msg.info.role === 'user') {
                 const infoBar = document.createElement('div');
                 infoBar.className = 'message-info-bar';
                 const agentName = msg.info.agent || (msg.info.role === 'user' ? 'User' : 'Assistant');
                 const modelName = msg.info.modelID ? `${msg.info.providerID ? msg.info.providerID + '/' : ''}${msg.info.modelID}` : '';
-                infoBar.innerHTML = `<span class="agent-tag">${msg.info.role === 'user' ? '👤' : '🤖'} ${agentName}</span>${modelName ? `<span class="model-tag">${modelName}</span>` : ''}`;
+                
+                // First row: agent and model
+                const firstRow = document.createElement('div');
+                firstRow.className = 'message-info-row';
+                firstRow.innerHTML = `<span class="agent-tag">${msg.info.role === 'user' ? '👤' : '🤖'} ${agentName}</span>${modelName ? `<span class="model-tag">${modelName}</span>` : ''}`;
+                infoBar.appendChild(firstRow);
+                
+                // Second row: timestamp
+                if (msg.info.time && msg.info.time.created) {
+                    const secondRow = document.createElement('div');
+                    secondRow.className = 'message-info-row message-timestamp';
+                    const timestamp = new Date(msg.info.time.created);
+                    secondRow.textContent = timestamp.toLocaleString();
+                    infoBar.appendChild(secondRow);
+                }
+                
                 bubble.appendChild(infoBar);
             }
             
@@ -1299,12 +1314,6 @@ async function loadMoreMessages() {
             
             // Insert at the right position
             messagesContainer.insertBefore(bubble, insertPoint);
-            
-            // Add timestamp
-            const time = document.createElement('div');
-            time.className = 'message-time';
-            time.textContent = new Date(msg.info.time.created).toLocaleTimeString();
-            messagesContainer.insertBefore(time, insertPoint);
         }
     });
     
@@ -2197,7 +2206,22 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
         infoBar.className = 'message-info-bar';
         const agentName = metadata.agent || (role === 'user' ? 'User' : 'Assistant');
         const modelName = metadata.modelID ? `${metadata.providerID ? metadata.providerID + '/' : ''}${metadata.modelID}` : '';
-        infoBar.innerHTML = `<span class="agent-tag">${role === 'user' ? '👤' : '🤖'} ${agentName}</span>${modelName ? `<span class="model-tag">${modelName}</span>` : ''}`;
+        
+        // First row: agent and model
+        const firstRow = document.createElement('div');
+        firstRow.className = 'message-info-row';
+        firstRow.innerHTML = `<span class="agent-tag">${role === 'user' ? '👤' : '🤖'} ${agentName}</span>${modelName ? `<span class="model-tag">${modelName}</span>` : ''}`;
+        infoBar.appendChild(firstRow);
+        
+        // Second row: timestamp
+        if (metadata.time && metadata.time.created) {
+            const secondRow = document.createElement('div');
+            secondRow.className = 'message-info-row message-timestamp';
+            const timestamp = new Date(metadata.time.created);
+            secondRow.textContent = timestamp.toLocaleString();
+            infoBar.appendChild(secondRow);
+        }
+        
         bubble.appendChild(infoBar);
     }
 
@@ -2375,10 +2399,15 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     
     if (messagesContainer) {
         messagesContainer.appendChild(bubble);
-        const time = document.createElement('div');
-        time.className = 'message-time';
-        time.textContent = new Date().toLocaleTimeString();
-        messagesContainer.appendChild(time);
+        
+        // Only add separate time display if there's no metadata with timestamp
+        if (!metadata || !metadata.time || !metadata.time.created) {
+            const time = document.createElement('div');
+            time.className = 'message-time';
+            time.textContent = new Date().toLocaleTimeString();
+            messagesContainer.appendChild(time);
+        }
+        
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 }

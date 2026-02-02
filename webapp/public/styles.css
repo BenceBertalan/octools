@@ -329,42 +329,54 @@ body.dark-theme .progress-bar {
 
 .message-info-bar {
     font-size: 11px;
-    color: #333;
+    color: white;
     margin-bottom: 6px;
     display: flex;
-    gap: 8px;
-    align-items: center;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    flex-direction: column;
+    gap: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     padding-bottom: 4px;
     font-weight: 500;
 }
 
 body.dark .message-info-bar {
-    color: #e0e0e0;
-    border-bottom-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.message-info-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.message-timestamp {
+    font-size: 10px;
+    opacity: 0.85;
+    font-weight: 400;
 }
 
 .agent-tag {
-    color: #1976d2;
+    color: white;
     font-weight: 600;
 }
 
 body.dark .agent-tag {
-    color: #64b5f6;
+    color: white;
 }
 
 .model-tag {
-    background: rgba(0, 100, 200, 0.1);
+    background: rgba(255, 255, 255, 0.2);
     padding: 2px 6px;
     border-radius: 4px;
     font-family: monospace;
     font-size: 10px;
-    color: #0066cc;
+    color: white;
 }
 
 body.dark .model-tag {
-    background: rgba(100, 181, 246, 0.15);
-    color: #90caf9;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
 }
 
 .message-bubble.question-inline {
