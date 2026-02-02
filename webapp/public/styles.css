@@ -342,28 +342,28 @@ body.dark .option-item-inline {
 /* Fix for lists inside message bubbles */
 .message-bubble ul,
 .message-bubble ol {
-    margin: 4px 0; /* Reduced from 8px */
+    margin: 2px 0; /* Minimal spacing */
     padding-left: 24px;
 }
 
 .message-bubble li {
-    margin: 2px 0; /* Reduced from 4px */
+    margin: 0; /* No margin between list items */
 }
 
 .message-content ul,
 .message-content ol {
-    margin: 4px 0; /* Reduced from 8px */
+    margin: 2px 0; /* Minimal spacing */
     padding-left: 24px;
 }
 
 .message-content li {
-    margin: 2px 0; /* Reduced from 4px */
+    margin: 0; /* No margin between list items */
 }
 
 /* Reduce paragraph spacing */
 .message-bubble p,
 .message-content p {
-    margin: 4px 0; /* Reduced spacing between paragraphs */
+    margin: 2px 0; /* Minimal spacing between paragraphs */
 }
 
 .message-bubble p:first-child,
