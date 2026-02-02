@@ -167,8 +167,8 @@ function switchToRichMode() {
     if (inputContainer) inputContainer.classList.add('rich-mode');
     
     if (richEditor) {
-        // Convert simple text to HTML (basic conversion)
-        richEditor.innerHTML = simpleText ? marked.parse(simpleText) : '';
+        // Show plain text (no markdown rendering)
+        richEditor.textContent = simpleText || '';
         richEditor.focus();
     }
 }
@@ -406,8 +406,8 @@ function showEditMessageModal(messageText) {
     originalMessageText = messageText;
     
     if (editRichEditor) {
-        // Convert markdown to HTML for editing
-        editRichEditor.innerHTML = marked.parse(messageText);
+        // Show plain text for editing (no markdown rendering)
+        editRichEditor.textContent = messageText;
     }
     
     if (editMessageModal) {
@@ -843,11 +843,8 @@ function createReasoningSection(reasoningParts, messageID) {
     const content = document.createElement('div');
     content.className = 'reasoning-content' + (isExpanded ? ' expanded' : '');
     
-    try {
-        content.innerHTML = typeof marked !== 'undefined' ? marked.parse(reasoningText) : reasoningText;
-    } catch (e) {
-        content.textContent = reasoningText;
-    }
+    // Show plain text (no markdown rendering)
+    content.textContent = reasoningText;
     
     toggle.onclick = (e) => {
         e.stopPropagation();
@@ -1000,11 +997,8 @@ async function loadMoreMessages() {
             
             const content = document.createElement('div');
             content.className = 'message-content';
-            try {
-                content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
-            } catch (e) {
-                content.textContent = text;
-            }
+            // Show plain text (no markdown rendering)
+            content.textContent = text;
             bubble.appendChild(content);
             
             if (msg.info.error) bubble.classList.add('error');
@@ -1451,12 +1445,8 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
         if (messagesContainer) messagesContainer.appendChild(streamMsg);
     }
     
-    const content = streamMsg.querySelector('.message-content') || streamMsg;
-    if (typeof marked !== 'undefined') {
-        content.innerHTML = marked.parse(text);
-    } else {
-        content.textContent = text;
-    }
+    // Show plain text (no markdown rendering)
+    content.textContent = text;
     if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -1486,11 +1476,8 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
 
     const content = document.createElement('div');
     content.className = 'message-content';
-    try {
-        content.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
-    } catch (e) {
-        content.textContent = text;
-    }
+    // Show plain text (no markdown rendering)
+    content.textContent = text;
     bubble.appendChild(content);
 
     // Add edit button for user messages
