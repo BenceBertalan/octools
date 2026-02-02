@@ -24,6 +24,9 @@ const sessionDiffs = new Map(); // Map<sessionID, Array<FileDiff>>
 const expandedDiffs = new Set(); // Set<filename> for tracking expanded files
 let currentDrawerSession = null;
 
+// Session status tracking
+const sessionStatuses = new Map(); // Map<sessionID, 'idle' | 'busy' | 'error'>
+
 // Rich editor state
 let editorMode = 'simple';  // 'simple' | 'rich'
 let richEditorInstance = null;
@@ -860,6 +863,54 @@ function createReasoningSection(reasoningParts, messageID) {
     return section;
 }
 
+// Todo section helper
+function createTodoSection(todoParts, messageID) {
+    if (!todoParts || todoParts.length === 0) return null;
+    
+    const section = document.createElement('div');
+    section.className = 'todo-section';
+    section.id = `todo-section-${messageID}`;
+    
+    todoParts.forEach((todoPart, idx) => {
+        try {
+            const todoData = todoPart.tool === 'todowrite' && todoPart.state?.input?.todos 
+                ? todoPart.state.input.todos 
+                : (typeof todoPart.text === 'string' ? JSON.parse(todoPart.text) : todoPart.text);
+            
+            if (!todoData || !Array.isArray(todoData)) return;
+            
+            todoData.forEach(todo => {
+                const todoItem = document.createElement('div');
+                todoItem.className = `todo-item todo-${todo.status} todo-priority-${todo.priority}`;
+                
+                const statusIcon = {
+                    'pending': '⏸️',
+                    'in_progress': '▶️',
+                    'completed': '✅',
+                    'cancelled': '❌'
+                }[todo.status] || '⏸️';
+                
+                const priorityClass = todo.priority === 'high' ? 'todo-priority-high' : 
+                                     todo.priority === 'low' ? 'todo-priority-low' : '';
+                
+                todoItem.innerHTML = `
+                    <div class="todo-icon">${statusIcon}</div>
+                    <div class="todo-content ${priorityClass}">
+                        <div class="todo-text">${escapeHtml(todo.content)}</div>
+                        ${todo.status === 'in_progress' ? '<div class="todo-spinner"></div>' : ''}
+                    </div>
+                `;
+                
+                section.appendChild(todoItem);
+            });
+        } catch (e) {
+            console.error('Error parsing todo:', e, todoPart);
+        }
+    });
+    
+    return section.children.length > 0 ? section : null;
+}
+
 // Load more messages helper
 async function loadMoreMessages() {
     if (!currentSession || loadingMore) return;
@@ -1071,15 +1122,16 @@ function handleSubagentProgress(data) {
 }
 
 function createProgressBubble(messageID, partID) {
-    const container = document.getElementById('messagesContainer');
+    const sidebar = document.getElementById('progressSidebarContent');
+    if (!sidebar) return null;
+    
     const bubble = document.createElement('div');
     bubble.id = `progress-${messageID}-${partID}`;
     bubble.className = 'progress-bubble';
     bubble.dataset.messageId = messageID;
     bubble.dataset.partId = partID;
     bubble.dataset.startTime = Date.now();
-    container.appendChild(bubble);
-    container.scrollTop = container.scrollHeight;
+    sidebar.appendChild(bubble);
     return bubble;
 }
 
@@ -1412,8 +1464,8 @@ function removeStreamingMessage(messageID) {
     if (streamMsg) streamMsg.remove();
 }
 
-function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null, reasoningParts = null) {
-    if (!text && (!reasoningParts || reasoningParts.length === 0)) return;
+function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null, reasoningParts = null, todoParts = null) {
+    if (!text && (!reasoningParts || reasoningParts.length === 0) && (!todoParts || todoParts.length === 0)) return;
 
     const msgID = metadata ? (metadata.id || metadata.messageID) : null;
     if (msgID && document.getElementById('msg-' + msgID)) return;
@@ -1583,6 +1635,14 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     if (isWarning) bubble.classList.add('warning');
     if (isInfo) bubble.classList.add('info-blue');
     
+    // Add todo section if present
+    if (todoParts && todoParts.length > 0 && msgID) {
+        const todoSection = createTodoSection(todoParts, msgID);
+        if (todoSection) {
+            bubble.appendChild(todoSection);
+        }
+    }
+    
     // Add reasoning section if present
     if (reasoningParts && reasoningParts.length > 0 && msgID) {
         const reasoningSection = createReasoningSection(reasoningParts, msgID);
@@ -1690,6 +1750,18 @@ function connectWebSocket() {
         switch (type) {
             case 'session.status':
                 const sessionStatus = (data.status && data.status.type) || data.status || data.type;
+                const sessionID = data.sessionID || currentSessionID;
+                
+                // Track status for session list indicator
+                if (sessionID) {
+                    sessionStatuses.set(sessionID, sessionStatus);
+                    // Refresh session list if Settings tab is open to update indicators
+                    const settingsTab = document.querySelector('.tab-button[data-tab="settings"]');
+                    if (settingsTab && settingsTab.classList.contains('active')) {
+                        loadExistingSessions();
+                    }
+                }
+                
                 updateStatus(sessionStatus);
                 if (sessionStatus === 'busy') addTypingIndicator('assistant-typing');
                 else if (sessionStatus === 'idle') removeTypingIndicator('assistant-typing');
@@ -1892,10 +1964,22 @@ async function loadExistingSessions(search = '') {
         if (!response.ok) throw new Error('Failed to fetch sessions');
         const sessionsData = await safeJson(response) || [];
         
+        // Filter out tool/subagent sessions
+        const filteredSessions = sessionsData.filter(s => {
+            // Keep sessions with a projectID (user sessions)
+            // Filter out sessions with agent names indicating subagent/tool sessions
+            const subagentNames = ['task', 'explore', 'general', 'sentinel', 'janos', 'sculptor', 'kofi', 'architect'];
+            const isSubagent = s.agent && subagentNames.some(name => s.agent.toLowerCase().includes(name.toLowerCase()));
+            const hasNoProject = !s.projectID && !s.directory;
+            
+            // Keep session if it has a project OR if it's not a subagent
+            return s.projectID || s.directory || !isSubagent;
+        });
+        
         sessionList.innerHTML = '';
-        if (sessionsData.length === 0) { sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: #90949c;">No sessions found</div>'; return; }
+        if (filteredSessions.length === 0) { sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: #90949c;">No sessions found</div>'; return; }
         const groups = {};
-        sessionsData.forEach(s => {
+        filteredSessions.forEach(s => {
             const d = new Date(s.time.updated).toDateString();
             if (!groups[d]) groups[d] = []; groups[d].push(s);
         });
@@ -1903,7 +1987,9 @@ async function loadExistingSessions(search = '') {
             const h = document.createElement('div'); h.className = 'session-group-header'; h.textContent = d; sessionList.appendChild(h);
             ss.forEach(s => {
                 const item = document.createElement('div'); item.className = 'session-item';
-                item.innerHTML = `<div class="session-item-title">${s.title || s.id.substring(0, 12)}</div><div class="session-item-date">${new Date(s.time.updated).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+                const status = sessionStatuses.get(s.id) || 'idle';
+                const busyIndicator = status === 'busy' ? '<span class="session-busy-indicator">●</span>' : '';
+                item.innerHTML = `<div class="session-item-title">${busyIndicator}${s.title || s.id.substring(0, 12)}</div><div class="session-item-date">${new Date(s.time.updated).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
                 item.onclick = () => connectToSession(s); sessionList.appendChild(item);
             });
         });
@@ -1957,6 +2043,7 @@ async function connectToSession(session) {
         messagesToShow.forEach(msg => {
             const textParts = msg.parts.filter(p => p.type === 'text');
             const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
+            const todoParts = msg.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
             const text = textParts.map(p => p.text).join('\n');
             
             // Log all messages to Events tab
@@ -1967,14 +2054,15 @@ async function connectToSession(session) {
                 totalParts: msg.parts.length,
                 textParts: textParts.length,
                 reasoningParts: reasoningParts.length,
+                todoParts: todoParts.length,
                 hasText: !!text,
                 partTypes: msg.parts.map(p => p.type),
                 modelID: msg.info.modelID,
                 agent: msg.info.agent
             });
             
-            if (text || reasoningParts.length > 0) {
-                addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts);
+            if (text || reasoningParts.length > 0 || todoParts.length > 0) {
+                addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts, todoParts);
             }
         });
     } catch (e) { addEvent('Error', 'Connect failed: ' + e.message); }
@@ -1988,6 +2076,7 @@ async function loadSessionHistory(id) {
         msgs.forEach(msg => {
             const textParts = msg.parts.filter(p => p.type === 'text');
             const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
+            const todoParts = msg.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
             const text = textParts.map(p => p.text).join('\n');
             
             // Log all messages to Events tab
@@ -1998,14 +2087,15 @@ async function loadSessionHistory(id) {
                 totalParts: msg.parts.length,
                 textParts: textParts.length,
                 reasoningParts: reasoningParts.length,
+                todoParts: todoParts.length,
                 hasText: !!text,
                 partTypes: msg.parts.map(p => p.type),
                 modelID: msg.info.modelID,
                 agent: msg.info.agent
             });
             
-            if (text || reasoningParts.length > 0) {
-                addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts);
+            if (text || reasoningParts.length > 0 || todoParts.length > 0) {
+                addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts, todoParts);
             }
         });
     } catch (e) { console.error('History load failed:', e); }
