@@ -215,21 +215,12 @@ function handleSwipe() {
 
 // Helper function to programmatically switch tabs
 function switchTab(tabName) {
-    const tabIndex = tabOrder.indexOf(tabName);
-    if (tabIndex === -1) return;
-    
     // Update button states
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
     if (btn) btn.classList.add('active');
     
-    // Update slider position
-    const slider = document.getElementById('tabSlider');
-    if (slider) {
-        slider.setAttribute('data-active-tab', tabIndex);
-    }
-    
-    // Update active class on tab-content for any additional styling
+    // Update active class on tab-content to show/hide
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     const target = getEl(tabName + 'Tab');
     if (target) target.classList.add('active');
