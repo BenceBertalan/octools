@@ -44,6 +44,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .status-dot {
@@ -1777,6 +1778,243 @@ body.dark .diff-file-header:hover {
     background: #3d3d3d;
 }
 
+/* Tool Detail Drawer */
+.tool-drawer {
+    position: fixed;
+    top: 0;
+    right: -450px;
+    width: 450px;
+    height: 100vh;
+    background: white;
+    border-left: 1px solid var(--border-color);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    transition: right 0.3s ease;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+}
+
+.tool-drawer.open {
+    right: 0;
+}
+
+.tool-drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+}
+
+.tool-drawer-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.tool-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: #f8f9fa;
+}
+
+.tool-drawer-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #1c1e21;
+}
+
+.tool-drawer-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: #65676b;
+    transition: color 0.2s;
+}
+
+.tool-drawer-close:hover {
+    color: #1c1e21;
+}
+
+.tool-drawer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.tool-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #65676b;
+    font-size: 14px;
+}
+
+/* Tool Status Badge */
+.tool-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+.tool-status-badge.status-pending {
+    background: #fff9e6;
+    color: #856404;
+}
+
+.tool-status-badge.status-running {
+    background: #e3f2fd;
+    color: #0d47a1;
+    animation: pulseGlow 2s infinite;
+}
+
+.tool-status-badge.status-completed {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.tool-status-badge.status-error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+/* Tool Timeline */
+.tool-timeline {
+    margin: 20px 0;
+}
+
+.tool-timeline-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    position: relative;
+}
+
+.tool-timeline-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 24px;
+    bottom: -16px;
+    width: 2px;
+    background: #e0e0e0;
+}
+
+.tool-timeline-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    background: white;
+    border: 2px solid #e0e0e0;
+    z-index: 1;
+}
+
+.tool-timeline-content {
+    flex: 1;
+    padding-top: 2px;
+}
+
+.tool-timeline-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1c1e21;
+}
+
+.tool-timeline-time {
+    font-size: 11px;
+    color: #65676b;
+    margin-top: 2px;
+}
+
+.tool-timeline-desc {
+    font-size: 12px;
+    color: #444;
+    margin-top: 4px;
+}
+
+/* Tool Output Section */
+.tool-section {
+    margin: 20px 0;
+}
+
+.tool-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1c1e21;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tool-output-box {
+    background: #f6f8fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.tool-metadata-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    font-size: 12px;
+}
+
+.tool-metadata-label {
+    font-weight: 600;
+    color: #65676b;
+}
+
+.tool-metadata-value {
+    color: #1c1e21;
+    word-break: break-word;
+}
+
+/* Progress bubble clickable styles */
+.progress-clickable {
+    transition: all 0.2s ease;
+}
+
+.progress-clickable:hover {
+    transform: translateX(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    border-left-width: 4px;
+}
+
+.progress-clickable-hint {
+    margin-left: auto;
+    font-size: 14px;
+    opacity: 0.6;
+}
+
+.progress-clickable:hover .progress-clickable-hint {
+    opacity: 1;
+}
+
 body.dark .diff-file-name {
     color: #e0e0e0;
 }
@@ -1846,6 +2084,15 @@ body.dark .diff-line-context {
     }
     
     .diff-drawer.open {
+        right: 0;
+    }
+
+    .tool-drawer {
+        width: 90%;
+        right: -90%;
+    }
+    
+    .tool-drawer.open {
         right: 0;
     }
 
@@ -2015,6 +2262,84 @@ body.dark-theme .toast-notification {
 }
 
 body.dark-theme .toast-message {
+    color: #e4e6eb;
+}
+
+/* Dark Mode for Tool Drawer */
+body.dark .tool-drawer {
+    background: #1e1e1e;
+    border-left-color: #404040;
+}
+
+body.dark .tool-drawer-header {
+    background: #2d2d2d;
+    border-color: #404040;
+}
+
+body.dark .tool-drawer-header h3 {
+    color: #e0e0e0;
+}
+
+body.dark .tool-drawer-close {
+    color: #b0b0b0;
+}
+
+body.dark .tool-drawer-close:hover {
+    color: #e0e0e0;
+}
+
+body.dark .tool-status-badge.status-pending {
+    background: #3d3500;
+    color: #ffd54f;
+}
+
+body.dark .tool-status-badge.status-running {
+    background: #003d5c;
+    color: #64b5f6;
+}
+
+body.dark .tool-status-badge.status-completed {
+    background: #1b5e20;
+    color: #a5d6a7;
+}
+
+body.dark .tool-status-badge.status-error {
+    background: #5c1a1a;
+    color: #ef9a9a;
+}
+
+body.dark .tool-timeline-item::before {
+    background: #404040;
+}
+
+body.dark .tool-timeline-icon {
+    background: #2d2d2d;
+    border-color: #404040;
+}
+
+body.dark .tool-timeline-title {
+    color: #e0e0e0;
+}
+
+body.dark .tool-timeline-desc {
+    color: #b0b0b0;
+}
+
+body.dark .tool-output-box {
+    background: #2d2d2d;
+    border-color: #404040;
+    color: #e0e0e0;
+}
+
+body.dark .tool-metadata-label {
+    color: #999;
+}
+
+body.dark .tool-metadata-value {
+    color: #e0e0e0;
+}
+
+body.dark .tool-section-title {
     color: #e0e0e0;
 }
 

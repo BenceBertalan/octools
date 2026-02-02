@@ -22,6 +22,10 @@ let toolOutputs = new Map(); // progressID -> {agent, task, output}
 const progressBubbles = new Map(); // Map<messageID, Map<partID, bubbleElement>>
 const completedTools = new Map();  // Map<messageID, Array<toolName>>
 
+// Tool Event Store - tracks all events for each tool/agent
+const toolEventStore = new Map(); // Map<partID, ToolEventData>
+let activeToolDrawerPartID = null; // Currently open drawer
+
 // Session diff state
 const sessionDiffs = new Map(); // Map<sessionID, Array<FileDiff>>
 const expandedDiffs = new Set(); // Set<filename> for tracking expanded files
@@ -572,6 +576,17 @@ if (clearDiffBtn) {
     });
 }
 
+// Tool Drawer event listeners
+const toolDrawerClose = document.getElementById('toolDrawerClose');
+const toolDrawerOverlay = document.getElementById('toolDrawerOverlay');
+
+if (toolDrawerClose) {
+    toolDrawerClose.addEventListener('click', closeToolDrawer);
+}
+if (toolDrawerOverlay) {
+    toolDrawerOverlay.addEventListener('click', closeToolDrawer);
+}
+
 // Edit Session Modal event listeners
 const sessionNameDisplay = getEl('sessionNameDisplay');
 const editSessionModal = getEl('editSessionModal');
@@ -855,15 +870,14 @@ function handleSessionLiveness(data) {
         livenessContainer.style.cssText = `
             margin-top: 8px;
             font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            display: block;
+            width: 100%;
         `;
         
-        // Insert after the status-info div
+        // Insert inside the status-info div at the end
         const statusInfo = document.querySelector('.status-info');
-        if (statusInfo && statusInfo.parentNode) {
-            statusInfo.parentNode.insertBefore(livenessContainer, statusInfo.nextSibling);
+        if (statusInfo) {
+            statusInfo.appendChild(livenessContainer);
         }
     }
     
@@ -1273,6 +1287,17 @@ function updateLoadMoreButton(loading, hasMore = true) {
 function handleSubagentProgress(data) {
     const { messageID, partID, agent, task, status } = data;
     
+    // Store event in tool event store
+    storeToolEvent(partID, {
+        type: 'progress',
+        timestamp: Date.now(),
+        messageID,
+        agent,
+        task,
+        status,
+        data
+    });
+    
     // Get or create progress container for this message
     let messageProgressMap = progressBubbles.get(messageID);
     if (!messageProgressMap) {
@@ -1316,6 +1341,39 @@ function handleSubagentProgress(data) {
     }
 }
 
+// Tool Event Store Management
+function storeToolEvent(partID, event) {
+    if (!toolEventStore.has(partID)) {
+        toolEventStore.set(partID, {
+            partID,
+            events: [],
+            metadata: {},
+            output: '',
+            startTime: Date.now(),
+            currentStatus: 'pending'
+        });
+    }
+    
+    const toolData = toolEventStore.get(partID);
+    toolData.events.push(event);
+    
+    // Update current status
+    if (event.status) {
+        toolData.currentStatus = event.status;
+    }
+    
+    // Update metadata
+    if (event.agent) toolData.metadata.agent = event.agent;
+    if (event.task) toolData.metadata.task = event.task;
+    if (event.tool) toolData.metadata.tool = event.tool;
+    if (event.messageID) toolData.metadata.messageID = event.messageID;
+    
+    // If drawer is open for this tool, update it
+    if (activeToolDrawerPartID === partID) {
+        updateToolDrawerLive(partID);
+    }
+}
+
 function createProgressBubble(messageID, partID) {
     const container = document.getElementById('messagesContainer');
     if (!container) return null;
@@ -1334,6 +1392,7 @@ function createProgressBubble(messageID, partID) {
 function updateProgressBubble(bubble, agent, task, status) {
     const startTime = parseInt(bubble.dataset.startTime);
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const partID = bubble.dataset.partId;
     
     const icons = {
         pending: '⏳',
@@ -1344,16 +1403,27 @@ function updateProgressBubble(bubble, agent, task, status) {
     const icon = icons[status] || '🔄';
     const statusText = status.charAt(0).toUpperCase() + status.slice(1);
     
+    // Check if this is a supported agent type (bash or explore)
+    const isSupportedAgent = agent === 'bash' || agent === 'explore' || agent.toLowerCase() === 'bash' || agent.toLowerCase().includes('explore');
+    
     bubble.innerHTML = `
         <div class="progress-header">
             <span class="progress-icon">${icon}</span>
             <span class="progress-status">${statusText}: ${agent}</span>
             ${status === 'running' ? `<span class="progress-timer">⏱️ ${elapsed}s</span>` : ''}
+            ${isSupportedAgent ? '<span class="progress-clickable-hint">👁️</span>' : ''}
         </div>
         <div class="progress-task">${escapeHtml(task)}</div>
     `;
     
     bubble.className = `progress-bubble progress-${status}`;
+    
+    // Make clickable if supported agent
+    if (isSupportedAgent) {
+        bubble.classList.add('progress-clickable');
+        bubble.style.cursor = 'pointer';
+        bubble.onclick = () => openToolDrawer(partID);
+    }
     
     // Update timer for running tasks
     if (status === 'running' && !bubble.dataset.timerInterval) {
@@ -1366,6 +1436,7 @@ function updateProgressBubble(bubble, agent, task, status) {
             if (timer) {
                 const newElapsed = Math.floor((Date.now() - startTime) / 1000);
                 timer.textContent = `⏱️ ${newElapsed}s`;
+            }
             }
         }, 1000);
         bubble.dataset.timerInterval = intervalId;
@@ -1392,14 +1463,295 @@ function updateCompletedToolsSummary(messageID) {
     const moreText = moreCount > 0 ? ` · ${moreCount} more` : '';
     
     summary.innerHTML = `✅ ${displayTools}${moreText} completed`;
+    summary.style.cursor = 'pointer';
+    summary.title = 'Click to view completed tools';
+    
+    // Make clickable - show list of completed tools with their partIDs
+    summary.onclick = () => showCompletedToolsList(messageID);
     
     container.appendChild(summary);
+}
+
+function showCompletedToolsList(messageID) {
+    // Find all tool events for this message
+    const toolsForMessage = [];
+    toolEventStore.forEach((toolData, partID) => {
+        if (toolData.metadata.messageID === messageID && toolData.currentStatus === 'completed') {
+            toolsForMessage.push({ partID, ...toolData.metadata });
+        }
+    });
+    
+    if (toolsForMessage.length === 0) {
+        return; // Nothing to show
+    }
+    
+    // If only one tool, open it directly
+    if (toolsForMessage.length === 1) {
+        openToolDrawer(toolsForMessage[0].partID);
+        return;
+    }
+    
+    // Multiple tools - show selection modal
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    modalContent.style.maxWidth = '500px';
+    
+    modalContent.innerHTML = `
+        <div class="modal-header">
+            <h3>Completed Tools</h3>
+            <button class="modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${toolsForMessage.map(tool => `
+                    <div class="completed-tool-item" data-partid="${tool.partID}" style="
+                        padding: 12px;
+                        border: 1px solid #e0e0e0;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        transition: background 0.2s;
+                    ">
+                        <div style="font-weight: 600; color: #28a745;">✅ ${tool.agent || 'Tool'}</div>
+                        <div style="font-size: 12px; color: #666; margin-top: 4px;">${escapeHtml(tool.task || 'Completed')}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // Close handlers
+    modal.querySelector('.modal-close').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    
+    // Tool item click handlers
+    modalContent.querySelectorAll('.completed-tool-item').forEach(item => {
+        item.onmouseover = () => item.style.background = '#f0f0f0';
+        item.onmouseout = () => item.style.background = '';
+        item.onclick = () => {
+            const partID = item.dataset.partid;
+            modal.remove();
+            openToolDrawer(partID);
+        };
+    });
 }
 
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Tool Drawer Functions
+function openToolDrawer(partID) {
+    const toolData = toolEventStore.get(partID);
+    if (!toolData) {
+        console.warn('No tool data found for partID:', partID);
+        return;
+    }
+    
+    activeToolDrawerPartID = partID;
+    renderToolDrawer(toolData, partID);
+    
+    const drawer = document.getElementById('toolDrawer');
+    const overlay = document.getElementById('toolDrawerOverlay');
+    
+    drawer.classList.add('open');
+    overlay.classList.add('visible');
+}
+
+function closeToolDrawer() {
+    const drawer = document.getElementById('toolDrawer');
+    const overlay = document.getElementById('toolDrawerOverlay');
+    
+    drawer.classList.remove('open');
+    overlay.classList.remove('visible');
+    activeToolDrawerPartID = null;
+}
+
+function renderToolDrawer(toolData, partID) {
+    const title = document.getElementById('toolDrawerTitle');
+    const subtitle = document.getElementById('toolDrawerSubtitle');
+    const content = document.getElementById('toolDrawerContent');
+    
+    const agent = toolData.metadata.agent || 'Tool';
+    const task = toolData.metadata.task || 'Processing...';
+    const status = toolData.currentStatus;
+    
+    title.textContent = agent;
+    subtitle.textContent = task;
+    
+    // Calculate elapsed time
+    const elapsed = Math.floor((Date.now() - toolData.startTime) / 1000);
+    const elapsedStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+    
+    // Status badge
+    const statusIcons = {
+        pending: '⏳',
+        running: '🔄',
+        completed: '✅',
+        error: '❌'
+    };
+    const icon = statusIcons[status] || '🔄';
+    
+    content.innerHTML = `
+        <div class="tool-status-badge status-${status}">
+            ${icon} ${status.charAt(0).toUpperCase() + status.slice(1)}
+            ${status === 'running' ? `<span style="margin-left: 8px;">⏱️ ${elapsedStr}</span>` : ''}
+        </div>
+        
+        ${toolData.metadata.tool ? `
+            <div class="tool-section">
+                <div class="tool-section-title">Tool Information</div>
+                <div class="tool-metadata-grid">
+                    <div class="tool-metadata-label">Type:</div>
+                    <div class="tool-metadata-value">${toolData.metadata.tool}</div>
+                    <div class="tool-metadata-label">Part ID:</div>
+                    <div class="tool-metadata-value" style="font-family: monospace; font-size: 11px;">${partID}</div>
+                    <div class="tool-metadata-label">Duration:</div>
+                    <div class="tool-metadata-value">${elapsedStr}</div>
+                </div>
+            </div>
+        ` : ''}
+        
+        <div class="tool-section">
+            <div class="tool-section-title">Event Timeline</div>
+            <div class="tool-timeline" id="toolTimeline">
+                ${renderToolTimeline(toolData.events)}
+            </div>
+        </div>
+        
+        ${toolData.output ? `
+            <div class="tool-section">
+                <div class="tool-section-title">Output</div>
+                <div class="tool-output-box" id="toolOutputBox">${escapeHtml(toolData.output)}</div>
+            </div>
+        ` : ''}
+    `;
+    
+    // Update timer for running tasks
+    if (status === 'running' && !toolData.timerInterval) {
+        toolData.timerInterval = setInterval(() => {
+            if (activeToolDrawerPartID === partID) {
+                const newElapsed = Math.floor((Date.now() - toolData.startTime) / 1000);
+                const newElapsedStr = newElapsed < 60 ? `${newElapsed}s` : `${Math.floor(newElapsed / 60)}m ${newElapsed % 60}s`;
+                const timerSpan = content.querySelector('.tool-status-badge span');
+                if (timerSpan) {
+                    timerSpan.textContent = `⏱️ ${newElapsedStr}`;
+                }
+                // Update duration in metadata
+                const durationValue = content.querySelector('.tool-metadata-value:nth-child(6)');
+                if (durationValue) {
+                    durationValue.textContent = newElapsedStr;
+                }
+            } else {
+                clearInterval(toolData.timerInterval);
+                delete toolData.timerInterval;
+            }
+        }, 1000);
+    }
+}
+
+function renderToolTimeline(events) {
+    if (!events || events.length === 0) {
+        return '<div style="color: #999; font-size: 12px;">No events yet</div>';
+    }
+    
+    return events.map(event => {
+        const time = new Date(event.timestamp);
+        const timeStr = time.toLocaleTimeString();
+        
+        let icon = '⚫';
+        let title = 'Event';
+        let desc = '';
+        
+        if (event.type === 'progress') {
+            if (event.status === 'pending') {
+                icon = '⏳';
+                title = 'Task Queued';
+            } else if (event.status === 'running') {
+                icon = '🔄';
+                title = 'Task Started';
+                desc = event.task;
+            } else if (event.status === 'completed') {
+                icon = '✅';
+                title = 'Task Completed';
+            } else if (event.status === 'error') {
+                icon = '❌';
+                title = 'Task Failed';
+                desc = event.data?.error || '';
+            }
+        }
+        
+        return `
+            <div class="tool-timeline-item">
+                <div class="tool-timeline-icon">${icon}</div>
+                <div class="tool-timeline-content">
+                    <div class="tool-timeline-title">${title}</div>
+                    <div class="tool-timeline-time">${timeStr}</div>
+                    ${desc ? `<div class="tool-timeline-desc">${escapeHtml(desc)}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateToolDrawerLive(partID) {
+    if (activeToolDrawerPartID !== partID) return;
+    
+    const toolData = toolEventStore.get(partID);
+    if (!toolData) return;
+    
+    // Re-render the timeline
+    const timelineContainer = document.getElementById('toolTimeline');
+    if (timelineContainer) {
+        timelineContainer.innerHTML = renderToolTimeline(toolData.events);
+    }
+    
+    // Update status badge
+    const statusBadge = document.querySelector('.tool-status-badge');
+    if (statusBadge) {
+        const status = toolData.currentStatus;
+        const statusIcons = {
+            pending: '⏳',
+            running: '🔄',
+            completed: '✅',
+            error: '❌'
+        };
+        const icon = statusIcons[status] || '🔄';
+        const elapsed = Math.floor((Date.now() - toolData.startTime) / 1000);
+        const elapsedStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+        
+        statusBadge.className = `tool-status-badge status-${status}`;
+        statusBadge.innerHTML = `
+            ${icon} ${status.charAt(0).toUpperCase() + status.slice(1)}
+            ${status === 'running' ? `<span style="margin-left: 8px;">⏱️ ${elapsedStr}</span>` : ''}
+        `;
+    }
+    
+    // Update output if present
+    if (toolData.output) {
+        let outputBox = document.getElementById('toolOutputBox');
+        if (!outputBox) {
+            // Create output section if it doesn't exist
+            const content = document.getElementById('toolDrawerContent');
+            const outputSection = document.createElement('div');
+            outputSection.className = 'tool-section';
+            outputSection.innerHTML = `
+                <div class="tool-section-title">Output</div>
+                <div class="tool-output-box" id="toolOutputBox">${escapeHtml(toolData.output)}</div>
+            `;
+            content.appendChild(outputSection);
+        } else {
+            outputBox.textContent = toolData.output;
+        }
+    }
 }
 
 // Session Diff Functions
@@ -1994,6 +2346,31 @@ function connectWebSocket() {
             case 'message.part':
                 const msgID = data.messageID || data.id;
                 const part = data.part || (data.parts && data.parts[0]);
+                
+                // Store tool output in event store
+                if (part && (part.type === 'tool' || part.type === 'subtask')) {
+                    const partID = part.id;
+                    
+                    // Initialize tool event if not exists
+                    if (!toolEventStore.has(partID)) {
+                        storeToolEvent(partID, {
+                            type: 'tool_init',
+                            timestamp: Date.now(),
+                            messageID: msgID,
+                            tool: part.tool,
+                            agent: part.metadata?.subagent_type || part.state?.agent || part.tool,
+                            task: part.metadata?.description || part.state?.title || 'Processing...'
+                        });
+                    }
+                    
+                    // Capture output from delta or text
+                    if (data.delta || part.text) {
+                        const toolData = toolEventStore.get(partID);
+                        if (toolData) {
+                            toolData.output += (data.delta || part.text || '');
+                        }
+                    }
+                }
                 
                 // Handle tool parts (like todowrite) separately
                 if (part && part.type === 'tool' && part.tool === 'todowrite') {
