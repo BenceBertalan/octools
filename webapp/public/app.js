@@ -1771,18 +1771,72 @@ function connectWebSocket() {
             case 'message.part':
                 const msgID = data.messageID || data.id;
                 const part = data.part || (data.parts && data.parts[0]);
-                let fullText = messageBuffer.get(msgID) || '';
-                fullText += (data.delta || data.text || '');
-                messageBuffer.set(msgID, fullText);
-                updateStreamingMessage(msgID, fullText, part?.type === 'reasoning', data.message || {});
+                
+                // Handle tool parts (like todowrite) separately
+                if (part && part.type === 'tool' && part.tool === 'todowrite') {
+                    // Tool part detected - will be rendered when message completes
+                    addEvent('Todo Tool Part Received', {
+                        messageID: msgID,
+                        tool: part.tool,
+                        hasState: !!part.state,
+                        hasInput: !!(part.state && part.state.input)
+                    });
+                    // Update streaming message to show that todos are being processed
+                    let fullText = messageBuffer.get(msgID) || '';
+                    updateStreamingMessage(msgID, fullText, part?.type === 'reasoning', data.message || {});
+                } else {
+                    // Regular text/reasoning parts
+                    let fullText = messageBuffer.get(msgID) || '';
+                    fullText += (data.delta || data.text || '');
+                    messageBuffer.set(msgID, fullText);
+                    updateStreamingMessage(msgID, fullText, part?.type === 'reasoning', data.message || {});
+                }
                 break;
             case 'message.complete':
                 const finalID = data.messageID || data.id;
                 let finalContent = messageBuffer.get(finalID) || (data.message && data.message.text);
                 removeStreamingMessage(finalID);
                 if (document.getElementById('msg-' + finalID)) { messageBuffer.delete(finalID); return; }
-                const msgError = data.message?.error;
-                addMessage('assistant', finalContent || (msgError ? `❌ Error: ${msgError.message}` : '(No content)'), false, !!msgError, false, false, data.message || {});
+                
+                // Fetch full message with all parts (including todos, reasoning, etc.)
+                if (currentSession) {
+                    fetch(`/api/session/${currentSession.id}/messages?limit=10`)
+                        .then(res => res.json())
+                        .then(messages => {
+                            const fullMsg = messages.find(m => m.info.id === finalID);
+                            if (fullMsg) {
+                                const textParts = fullMsg.parts.filter(p => p.type === 'text');
+                                const reasoningParts = fullMsg.parts.filter(p => p.type === 'reasoning');
+                                const todoParts = fullMsg.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
+                                const text = textParts.map(p => p.text).join('\n');
+                                
+                                addEvent('Message Complete with Parts', {
+                                    messageID: finalID,
+                                    textParts: textParts.length,
+                                    reasoningParts: reasoningParts.length,
+                                    todoParts: todoParts.length,
+                                    partTypes: fullMsg.parts.map(p => p.type)
+                                });
+                                
+                                if (text || reasoningParts.length > 0 || todoParts.length > 0) {
+                                    addMessage(fullMsg.info.role, text, false, !!fullMsg.info.error, false, false, fullMsg.info, null, reasoningParts, todoParts);
+                                }
+                            } else {
+                                // Fallback to text-only message
+                                const msgError = data.message?.error;
+                                addMessage('assistant', finalContent || (msgError ? `❌ Error: ${msgError.message}` : '(No content)'), false, !!msgError, false, false, data.message || {});
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Failed to fetch full message:', err);
+                            const msgError = data.message?.error;
+                            addMessage('assistant', finalContent || (msgError ? `❌ Error: ${msgError.message}` : '(No content)'), false, !!msgError, false, false, data.message || {});
+                        });
+                } else {
+                    const msgError = data.message?.error;
+                    addMessage('assistant', finalContent || (msgError ? `❌ Error: ${msgError.message}` : '(No content)'), false, !!msgError, false, false, data.message || {});
+                }
+                
                 messageBuffer.delete(finalID);
                 removeTypingIndicator('assistant-typing');
                 
