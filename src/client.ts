@@ -9,7 +9,12 @@ import {
   Message, 
   BusEvent,
   AuthError,
-  SessionErrorEvent
+  SessionErrorEvent,
+  AgentInfo,
+  GlobalConfig,
+  ModelPriorityConfig,
+  ProviderListResponse,
+  ModelInfo
 } from './types';
 
 export class OctoolsClient extends EventEmitter {
@@ -364,7 +369,8 @@ export class OctoolsClient extends EventEmitter {
 
   public async sendMessage(sessionID: string, text: string, options?: { 
     agent?: string; 
-    model?: { providerID: string; modelID: string } 
+    model?: { providerID: string; modelID: string };
+    prompt?: string;
   }): Promise<Message> {
     // Save last user prompt for alternative model retry
     this.lastUserPrompts.set(sessionID, { text, options });
@@ -377,6 +383,7 @@ export class OctoolsClient extends EventEmitter {
     };
     if (options?.agent) body.agent = options.agent;
     if (activeModel) body.model = activeModel;
+    if (options?.prompt) body.prompt = options.prompt;
 
     console.log(`[Octools] POST /session/${sessionID}/message body:`, JSON.stringify(body));
 
@@ -694,5 +701,126 @@ export class OctoolsClient extends EventEmitter {
       this.startLivenessMonitoring(sessionID);
       console.log(`[Octools] Liveness monitoring resumed for session ${sessionID}`);
     }
+  }
+
+  // --- Agent Management Methods ---
+
+  /**
+   * Get list of all available agents
+   */
+  public async getAgents(): Promise<AgentInfo[]> {
+    const response = await fetch(`${this.config.baseUrl}/agent`, {
+      method: 'GET',
+      headers: this.getHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get agents: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  // --- Global Config Management Methods ---
+
+  /**
+   * Get global configuration
+   */
+  public async getGlobalConfig(): Promise<GlobalConfig> {
+    const response = await fetch(`${this.config.baseUrl}/global/config`, {
+      method: 'GET',
+      headers: this.getHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get global config: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Update global configuration
+   */
+  public async updateGlobalConfig(config: Partial<GlobalConfig>): Promise<GlobalConfig> {
+    const response = await fetch(`${this.config.baseUrl}/global/config`, {
+      method: 'PATCH',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(config)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update global config: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  // --- Provider/Model Management Methods ---
+
+  /**
+   * Get all providers and models
+   */
+  public async getProviders(): Promise<ProviderListResponse> {
+    const response = await fetch(`${this.config.baseUrl}/provider`, {
+      method: 'GET',
+      headers: this.getHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get providers: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get flat list of all models across all providers
+   */
+  public async getModels(): Promise<ModelInfo[]> {
+    const providers = await this.getProviders();
+    const models: ModelInfo[] = [];
+
+    for (const provider of providers.all) {
+      for (const model of Object.values(provider.models)) {
+        models.push(model);
+      }
+    }
+
+    return models;
+  }
+
+  // --- Model Priority Management Methods ---
+
+  /**
+   * Get model priority configuration
+   */
+  public async getModelPriority(): Promise<ModelPriorityConfig> {
+    const config = await this.getGlobalConfig();
+    return config.model_priority || { enabled: false, models: [] };
+  }
+
+  /**
+   * Set model priority configuration
+   */
+  public async setModelPriority(priority: ModelPriorityConfig): Promise<void> {
+    await this.updateGlobalConfig({
+      model_priority: priority
+    });
+  }
+
+  /**
+   * Helper to get auth headers
+   */
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (this.config.password) {
+      const auth = Buffer.from(`opencode:${this.config.password}`).toString('base64');
+      headers['Authorization'] = `Basic ${auth}`;
+    }
+    return headers;
   }
 }

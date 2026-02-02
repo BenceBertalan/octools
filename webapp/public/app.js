@@ -143,24 +143,77 @@ const editRichEditor = getEl('editRichEditor');
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const tab = btn.dataset.tab;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        const target = getEl(tab + 'Tab');
-        if (target) target.classList.add('active');
+        switchTab(tab);
     });
 });
 
+// Add swipe gesture support for tab switching
+const tabOrder = ['chat', 'events', 'tools'];
+let touchStartX = 0;
+let touchStartY = 0;
+let touchEndX = 0;
+let touchEndY = 0;
+
+const container = document.querySelector('.container');
+if (container) {
+    container.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    container.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, { passive: true });
+}
+
+function handleSwipe() {
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = touchEndY - touchStartY;
+    
+    // Only trigger if horizontal swipe is dominant
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+        const currentTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+        const currentIndex = tabOrder.indexOf(currentTab);
+        
+        if (currentIndex === -1) return;
+        
+        let newIndex;
+        if (deltaX > 0) {
+            // Swipe right - go to previous tab
+            newIndex = Math.max(0, currentIndex - 1);
+        } else {
+            // Swipe left - go to next tab
+            newIndex = Math.min(tabOrder.length - 1, currentIndex + 1);
+        }
+        
+        if (newIndex !== currentIndex) {
+            switchTab(tabOrder[newIndex]);
+        }
+    }
+}
+
 // Helper function to programmatically switch tabs
 function switchTab(tabName) {
+    const tabIndex = tabOrder.indexOf(tabName);
+    if (tabIndex === -1) return;
+    
+    // Update button states
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
-    if (btn) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        const target = getEl(tabName + 'Tab');
-        if (target) target.classList.add('active');
+    if (btn) btn.classList.add('active');
+    
+    // Update slider position
+    const slider = document.getElementById('tabSlider');
+    if (slider) {
+        slider.setAttribute('data-active-tab', tabIndex);
     }
+    
+    // Update active class on tab-content for any additional styling
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const target = getEl(tabName + 'Tab');
+    if (target) target.classList.add('active');
 }
 
 // Settings Tab switching
@@ -194,23 +247,53 @@ if (sessionSearch) {
 }
 
 // Modal controls
-// Hamburger menu toggle
+// Hamburger menu toggle - now opens menu modal
 if (hamburgerBtn) {
     hamburgerBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const isVisible = hamburgerMenu.style.display === 'block';
-        hamburgerMenu.style.display = isVisible ? 'none' : 'block';
+        const menuModal = document.getElementById('menuModal');
+        if (menuModal) {
+            menuModal.classList.add('active');
+        }
     });
 }
 
-// Close hamburger menu when clicking outside
+// Close menu modal
+const closeMenu = document.getElementById('closeMenu');
+if (closeMenu) {
+    closeMenu.addEventListener('click', () => {
+        document.getElementById('menuModal').classList.remove('active');
+    });
+}
+
+// Menu item handlers
+const menuSessionSettings = document.getElementById('menuSessionSettings');
+const menuAgentSettings = document.getElementById('menuAgentSettings');
+
+if (menuSessionSettings) {
+    menuSessionSettings.addEventListener('click', () => {
+        document.getElementById('menuModal').classList.remove('active');
+        settingsModal.classList.add('active');
+        loadExistingSessions();
+    });
+}
+
+if (menuAgentSettings) {
+    menuAgentSettings.addEventListener('click', () => {
+        document.getElementById('menuModal').classList.remove('active');
+        // Will open agent settings modal (to be implemented)
+        console.log('Agent settings clicked - modal coming soon');
+    });
+}
+
+// Close hamburger menu when clicking outside (legacy - can be removed later)
 document.addEventListener('click', (e) => {
     if (hamburgerMenu && !hamburgerMenu.contains(e.target) && e.target !== hamburgerBtn) {
         hamburgerMenu.style.display = 'none';
     }
 });
 
-// Settings menu item
+// Settings menu item (legacy dropdown - kept for backward compatibility)
 if (menuSettings) {
     menuSettings.addEventListener('click', () => {
         hamburgerMenu.style.display = 'none';
@@ -231,10 +314,591 @@ if (closeAuth) {
     });
 }
 
+// Close modals when clicking on background
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal') && e.target.classList.contains('active')) {
+        e.target.classList.remove('active');
+    }
+});
+
+// ==========================
+// Agent Settings Modal
+// ==========================
+
+const agentSettingsModal = document.getElementById('agentSettingsModal');
+const closeAgentSettings = document.getElementById('closeAgentSettings');
+const agentSettingsSelect = document.getElementById('agentSettingsSelect');
+const agentModelSelect = document.getElementById('agentModelSelect');
+const agentTemperature = document.getElementById('agentTemperature');
+const agentTemperatureValue = document.getElementById('agentTemperatureValue');
+const agentTopP = document.getElementById('agentTopP');
+const agentTopPValue = document.getElementById('agentTopPValue');
+const agentPrompt = document.getElementById('agentPrompt');
+const saveAgentSettings = document.getElementById('saveAgentSettings');
+const resetAgentSettings = document.getElementById('resetAgentSettings');
+
+let currentAgentDefaults = {};
+
+// ==========================
+// Model Priority Modal Elements
+// ==========================
+
+const modelPriorityModal = document.getElementById('modelPriorityModal');
+const closeModelPriority = document.getElementById('closeModelPriority');
+const menuModelPriority = document.getElementById('menuModelPriority');
+
+// ==========================
+// Cost Warning Modal Elements
+// ==========================
+
+const costWarningModal = document.getElementById('costWarningModal');
+const cwCurrentModel = document.getElementById('cwCurrentModel');
+const modelChoices = document.getElementById('modelChoices');
+const cwUseSelected = document.getElementById('cwUseSelected');
+const cwContinue = document.getElementById('cwContinue');
+const cwDontAskAgain = document.getElementById('cwDontAskAgain');
+
+// ==========================
+// Agent Settings Modal Handlers
+// ==========================
+
+// Close modal
+if (closeAgentSettings) {
+    closeAgentSettings.addEventListener('click', () => {
+        agentSettingsModal.classList.remove('active');
+    });
+}
+
+// Update slider values
+if (agentTemperature) {
+    agentTemperature.addEventListener('input', (e) => {
+        agentTemperatureValue.textContent = e.target.value;
+    });
+}
+
+if (agentTopP) {
+    agentTopP.addEventListener('input', (e) => {
+        agentTopPValue.textContent = e.target.value;
+    });
+}
+
+// Load agent settings when modal opens (triggered by menu)
+if (menuAgentSettings) {
+    menuAgentSettings.addEventListener('click', async () => {
+        document.getElementById('menuModal').classList.remove('active');
+        agentSettingsModal.classList.add('active');
+        await loadAgentSettings();
+    });
+}
+
+// Load agents and populate form
+async function loadAgentSettings() {
+    try {
+        // Load agents and config
+        const [agents, config, models] = await Promise.all([
+            fetch('/api/agents').then(r => r.json()),
+            fetch('/api/config').then(r => r.json()),
+            fetch('/api/models').then(r => r.json())
+        ]);
+
+        // Populate agent dropdown
+        agentSettingsSelect.innerHTML = agents.map(agent => 
+            `<option value="${agent.name}">${agent.name}</option>`
+        ).join('');
+
+        // Populate model dropdown
+        agentModelSelect.innerHTML = '<option value="">Use agent default</option>' +
+            models.map(m => 
+                `<option value="${m.providerID}/${m.modelID}">${m.name}</option>`
+            ).join('');
+
+        // Load settings for first agent
+        if (agents.length > 0) {
+            await loadAgentConfig(agents[0].name, agents, config);
+        }
+
+        // Listen for agent selection changes
+        agentSettingsSelect.addEventListener('change', async (e) => {
+            const selectedAgent = agents.find(a => a.name === e.target.value);
+            if (selectedAgent) {
+                await loadAgentConfig(selectedAgent.name, agents, config);
+            }
+        });
+
+    } catch (error) {
+        console.error('Failed to load agent settings:', error);
+        showToast('Failed to load agent settings', 'error');
+    }
+}
+
+async function loadAgentConfig(agentName, agents, config) {
+    const agent = agents.find(a => a.name === agentName);
+    if (!agent) return;
+
+    // Store defaults
+    currentAgentDefaults = {
+        model: agent.model ? `${agent.model.providerID}/${agent.model.modelID}` : '',
+        temperature: agent.temperature || 0.7,
+        topP: agent.topP || 1.0,
+        prompt: agent.prompt || ''
+    };
+
+    // Get user overrides
+    const overrides = config.agent && config.agent[agentName] ? config.agent[agentName] : {};
+
+    // Populate form with overrides or defaults
+    agentModelSelect.value = overrides.model || '';
+    agentTemperature.value = overrides.temperature !== undefined ? overrides.temperature : currentAgentDefaults.temperature;
+    agentTemperatureValue.textContent = agentTemperature.value;
+    agentTopP.value = overrides.top_p !== undefined ? overrides.top_p : currentAgentDefaults.topP;
+    agentTopPValue.textContent = agentTopP.value;
+    agentPrompt.value = overrides.prompt || '';
+}
+
+// Save agent settings
+if (saveAgentSettings) {
+    saveAgentSettings.addEventListener('click', async () => {
+        const agentName = agentSettingsSelect.value;
+        if (!agentName) return;
+
+        try {
+            const settings = {
+                agent: {
+                    [agentName]: {
+                        model: agentModelSelect.value || undefined,
+                        temperature: parseFloat(agentTemperature.value),
+                        top_p: parseFloat(agentTopP.value),
+                        prompt: agentPrompt.value || undefined
+                    }
+                }
+            };
+
+            await fetch('/api/config', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+
+            showToast(`Settings saved for ${agentName}`, 'success');
+            agentSettingsModal.classList.remove('active');
+        } catch (error) {
+            console.error('Failed to save agent settings:', error);
+            showToast('Failed to save settings', 'error');
+        }
+    });
+}
+
+// Reset to defaults
+if (resetAgentSettings) {
+    resetAgentSettings.addEventListener('click', () => {
+        agentModelSelect.value = '';
+        agentTemperature.value = currentAgentDefaults.temperature;
+        agentTemperatureValue.textContent = currentAgentDefaults.temperature;
+        agentTopP.value = currentAgentDefaults.topP;
+        agentTopPValue.textContent = currentAgentDefaults.topP;
+        agentPrompt.value = '';
+    });
+}
+
+// ==========================
+// Model Priority Modal
+// ==========================
+
+if (modelPriorityModal && closeModelPriority && menuModelPriority) {
+    // Close modal
+    closeModelPriority.addEventListener('click', () => {
+        modelPriorityModal.classList.remove('active');
+    });
+
+    // Close on background click
+    modelPriorityModal.addEventListener('click', (e) => {
+        if (e.target === modelPriorityModal) {
+            modelPriorityModal.classList.remove('active');
+        }
+    });
+
+    // Open from menu
+    menuModelPriority.addEventListener('click', async () => {
+        if (menuModal) menuModal.classList.remove('active');
+        modelPriorityModal.classList.add('active');
+        await loadModelPriority();
+    });
+
+    // Save button
+    const saveModelPriority = document.getElementById('saveModelPriority');
+    if (saveModelPriority) {
+        saveModelPriority.addEventListener('click', async () => {
+            try {
+                const enabled = document.getElementById('enableCostWarnings').checked;
+                const models = getCurrentPriorityList();
+
+                const response = await fetch('/api/config', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model_priority: { enabled, models }
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save');
+
+                showToast('Model priority saved', 'success');
+                modelPriorityModal.classList.remove('active');
+            } catch (error) {
+                console.error('Failed to save model priority:', error);
+                showToast('Failed to save priority', 'error');
+            }
+        });
+    }
+
+    // Add model button
+    const addModelBtn = document.getElementById('addModelBtn');
+    if (addModelBtn) {
+        addModelBtn.addEventListener('click', () => {
+            const select = document.getElementById('addModelSelect');
+            const model = select.value;
+
+            if (!model) {
+                showToast('Please select a model', 'error');
+                return;
+            }
+
+            const models = getCurrentPriorityList();
+            models.push(model);
+            renderPriorityList(models);
+
+            // Remove from dropdown
+            const option = select.querySelector(`option[value="${model}"]`);
+            if (option) option.remove();
+            select.value = '';
+        });
+    }
+}
+
+async function loadModelPriority() {
+    try {
+        const [config, models] = await Promise.all([
+            fetch('/api/config').then(r => r.json()),
+            fetch('/api/models').then(r => r.json())
+        ]);
+
+        const priority = config.model_priority || { enabled: false, models: [] };
+
+        // Populate checkbox
+        const enableCostWarnings = document.getElementById('enableCostWarnings');
+        if (enableCostWarnings) {
+            enableCostWarnings.checked = priority.enabled;
+        }
+
+        // Render priority list
+        renderPriorityList(priority.models);
+
+        // Populate add model dropdown (exclude already added)
+        const addModelSelect = document.getElementById('addModelSelect');
+        if (addModelSelect) {
+            const availableModels = models.filter(m =>
+                !priority.models.includes(`${m.providerID}/${m.modelID}`)
+            );
+
+            // Clear and add default option
+            addModelSelect.innerHTML = '<option value="">Select a model...</option>';
+            
+            // Group models by provider
+            const groups = {};
+            availableModels.forEach(m => {
+                if (!groups[m.providerID]) groups[m.providerID] = [];
+                groups[m.providerID].push(m);
+            });
+            
+            // Create optgroups
+            Object.entries(groups).forEach(([providerID, providerModels]) => {
+                const group = document.createElement('optgroup');
+                group.label = providerID;
+                
+                providerModels.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = `${m.providerID}/${m.modelID}`;
+                    opt.textContent = m.name || m.modelID;
+                    group.appendChild(opt);
+                });
+                
+                addModelSelect.appendChild(group);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load model priority:', error);
+        showToast('Failed to load model priority', 'error');
+    }
+}
+
+function renderPriorityList(models) {
+    const priorityList = document.getElementById('priorityList');
+    if (!priorityList) return;
+
+    if (!models || models.length === 0) {
+        priorityList.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">No models added yet. Add models below.</div>';
+        return;
+    }
+
+    priorityList.innerHTML = models.map((model, index) => `
+        <div class="priority-item" data-model="${model}">
+            <span class="priority-rank">${index + 1}.</span>
+            <span class="priority-handle">≡</span>
+            <span class="priority-model">${model}</span>
+            <div class="priority-controls">
+                <button class="btn-icon" data-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
+                <button class="btn-icon" data-action="down" ${index === models.length - 1 ? 'disabled' : ''}>↓</button>
+                <button class="btn-icon" data-action="remove">✕</button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add event listeners to all buttons
+    priorityList.querySelectorAll('.btn-icon').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            const item = e.target.closest('.priority-item');
+            if (!item) return;
+
+            const model = item.dataset.model;
+            handlePriorityAction(action, model);
+        });
+    });
+}
+
+function handlePriorityAction(action, model) {
+    const models = getCurrentPriorityList();
+    const index = models.indexOf(model);
+
+    if (index === -1) return;
+
+    if (action === 'up' && index > 0) {
+        // Swap with previous
+        [models[index], models[index - 1]] = [models[index - 1], models[index]];
+    } else if (action === 'down' && index < models.length - 1) {
+        // Swap with next
+        [models[index], models[index + 1]] = [models[index + 1], models[index]];
+    } else if (action === 'remove') {
+        // Remove from list
+        models.splice(index, 1);
+
+        // Add back to dropdown in the correct optgroup
+        const addModelSelect = document.getElementById('addModelSelect');
+        if (addModelSelect) {
+            // Parse provider and model from the format "provider/model"
+            const [providerID, modelID] = model.split('/');
+            
+            // Find or create the optgroup
+            let group = addModelSelect.querySelector(`optgroup[label="${providerID}"]`);
+            if (!group) {
+                group = document.createElement('optgroup');
+                group.label = providerID;
+                addModelSelect.appendChild(group);
+            }
+            
+            // Add the option to the group
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = modelID; // Use just the model ID for display
+            group.appendChild(option);
+        }
+    }
+
+    renderPriorityList(models);
+}
+
+function getCurrentPriorityList() {
+    const priorityList = document.getElementById('priorityList');
+    if (!priorityList) return [];
+
+    return Array.from(priorityList.querySelectorAll('.priority-item'))
+        .map(item => item.dataset.model);
+}
+
 function showAuthError(message) {
     if (authErrorDetails) authErrorDetails.textContent = typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
     if (authModal) authModal.classList.add('active');
     updateStatus('error', 'Authentication Failed');
+}
+
+// ==========================
+// Cost Warning Modal
+// ==========================
+
+async function checkModelPriority(model) {
+    // Check if warnings are disabled for this session
+    if (sessionStorage.getItem('skipModelWarning') === 'true') {
+        return true;
+    }
+
+    try {
+        const config = await fetch('/api/config').then(r => r.json());
+        const priority = config.model_priority;
+
+        // If priority is not enabled or empty, allow all models
+        if (!priority?.enabled || !priority.models || priority.models.length === 0) {
+            return true;
+        }
+
+        const currentModel = `${model.providerID}/${model.modelID}`;
+
+        // If current model is in priority list, allow it
+        if (priority.models.includes(currentModel)) {
+            return true;
+        }
+
+        // Show warning modal and wait for user decision
+        return await showCostWarningModal(currentModel, priority.models);
+    } catch (error) {
+        console.error('Failed to check model priority:', error);
+        // On error, allow the request to proceed
+        return true;
+    }
+}
+
+function showCostWarningModal(currentModel, priorityModels) {
+    return new Promise((resolve) => {
+        if (!costWarningModal || !cwCurrentModel || !modelChoices) {
+            resolve(true);
+            return;
+        }
+
+        // Set current model name
+        cwCurrentModel.textContent = currentModel;
+
+        // Render priority model choices
+        modelChoices.innerHTML = priorityModels.map((model, index) => `
+            <div class="model-choice ${index === 0 ? 'selected' : ''}" onclick="selectModelChoice(this)">
+                <input type="radio" name="modelChoice" value="${model}" ${index === 0 ? 'checked' : ''} id="choice_${index}">
+                <label for="choice_${index}">${model}</label>
+            </div>
+        `).join('');
+
+        // Reset checkbox
+        if (cwDontAskAgain) cwDontAskAgain.checked = false;
+
+        // Show modal
+        costWarningModal.classList.add('active');
+
+        // Handle "Use Selected Model" button
+        const useSelectedHandler = () => {
+            const selected = modelChoices.querySelector('input[name="modelChoice"]:checked');
+            if (selected && qsModelSelect) {
+                // Switch to selected model
+                const selectedModel = selected.value;
+                qsModelSelect.value = JSON.stringify({
+                    providerID: selectedModel.split('/')[0],
+                    modelID: selectedModel.split('/')[1]
+                });
+            }
+
+            if (cwDontAskAgain?.checked) {
+                sessionStorage.setItem('skipModelWarning', 'true');
+            }
+
+            cleanup();
+            resolve(true);
+        };
+
+        // Handle "Continue with Current" button
+        const continueHandler = () => {
+            if (cwDontAskAgain?.checked) {
+                sessionStorage.setItem('skipModelWarning', 'true');
+            }
+
+            cleanup();
+            resolve(true);
+        };
+
+        // Cleanup function
+        const cleanup = () => {
+            costWarningModal.classList.remove('active');
+            if (cwUseSelected) cwUseSelected.removeEventListener('click', useSelectedHandler);
+            if (cwContinue) cwContinue.removeEventListener('click', continueHandler);
+        };
+
+        // Add event listeners
+        if (cwUseSelected) cwUseSelected.addEventListener('click', useSelectedHandler);
+        if (cwContinue) cwContinue.addEventListener('click', continueHandler);
+    });
+}
+
+// Helper function for selecting model choice
+function selectModelChoice(element) {
+    // Remove selected class from all choices
+    const choices = document.querySelectorAll('.model-choice');
+    choices.forEach(c => c.classList.remove('selected'));
+
+    // Add selected class to clicked element
+    element.classList.add('selected');
+
+    // Check the radio button
+    const radio = element.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+}
+
+// ==========================
+// Agent Auto-Selection
+// ==========================
+
+async function autoSelectModelForAgent(agentName) {
+    if (!agentName || !qsModelSelect) return;
+
+    try {
+        const [config, agents] = await Promise.all([
+            fetch('/api/config').then(r => r.json()),
+            fetch('/api/agents').then(r => r.json())
+        ]);
+
+        // Check for user override first
+        const override = config.agent?.[agentName]?.model;
+        if (override) {
+            // Find matching model in the select dropdown
+            const options = Array.from(qsModelSelect.options);
+            const matchingOption = options.find(opt => {
+                if (!opt.value) return false;
+                try {
+                    const model = JSON.parse(opt.value);
+                    return `${model.providerID}/${model.modelID}` === override;
+                } catch {
+                    return false;
+                }
+            });
+
+            if (matchingOption) {
+                qsModelSelect.value = matchingOption.value;
+                if (modelSelect) modelSelect.value = matchingOption.value;
+                showToast(`Using ${override} for ${agentName}`, 'info');
+            }
+            return;
+        }
+
+        // Check agent's native default (agents from /api/agents don't have model info yet)
+        // This will work once the OpenCode API provides model defaults per agent
+        const agent = agents.find(a => a.name === agentName);
+        if (agent?.model) {
+            const modelId = `${agent.model.providerID}/${agent.model.modelID}`;
+            const options = Array.from(qsModelSelect.options);
+            const matchingOption = options.find(opt => {
+                if (!opt.value) return false;
+                try {
+                    const model = JSON.parse(opt.value);
+                    return `${model.providerID}/${model.modelID}` === modelId;
+                } catch {
+                    return false;
+                }
+            });
+
+            if (matchingOption) {
+                qsModelSelect.value = matchingOption.value;
+                if (modelSelect) modelSelect.value = matchingOption.value;
+                showToast(`Using ${modelId} for ${agentName}`, 'info');
+            }
+        }
+    } catch (error) {
+        console.error('Failed to auto-select model:', error);
+        // Silently fail - don't interrupt user flow
+    }
 }
 
 // ==========================
@@ -642,22 +1306,29 @@ if (closeFavorites) {
     });
 }
 
-// Double-tap on prompt bar to open favorites
-if (messageInput) {
-    messageInput.addEventListener('click', () => {
-        const now = Date.now();
-        if (now - lastPromptTap < 300) {
-            // Double tap detected
-            showFavoritesModal();
+// Double-tap on messages area (empty space) to open favorites
+if (messagesContainer) {
+    messagesContainer.addEventListener('click', (e) => {
+        // Only trigger if clicking the container itself (empty space), not message bubbles
+        if (e.target === messagesContainer || e.target.classList.contains('welcome-message')) {
+            const now = Date.now();
+            if (now - lastPromptTap < 300) {
+                // Double tap detected
+                showFavoritesModal();
+            }
+            lastPromptTap = now;
         }
-        lastPromptTap = now;
     });
 }
 
 if (qsAgentSelect) {
-    qsAgentSelect.addEventListener('change', (e) => {
-        if (agentSelect) agentSelect.value = e.target.value;
-        setCookie('favAgent', e.target.value);
+    qsAgentSelect.addEventListener('change', async (e) => {
+        const agentName = e.target.value;
+        if (agentSelect) agentSelect.value = agentName;
+        setCookie('favAgent', agentName);
+        
+        // Auto-select model for this agent
+        await autoSelectModelForAgent(agentName);
     });
 }
 
@@ -1328,6 +1999,39 @@ async function loadMoreMessages() {
             const bubble = document.createElement('div');
             bubble.className = `message-bubble ${msg.info.role}`;
             bubble.id = 'msg-' + msgID;
+            
+            // Add double-tap to favorite on message bubbles
+            if (msgID && text) {
+                let lastBubbleTap = 0;
+                bubble.addEventListener('click', (e) => {
+                    // Don't trigger if clicking the favorite button or edit button
+                    if (e.target.classList.contains('favorite-btn') || 
+                        e.target.classList.contains('edit-message-btn') ||
+                        e.target.closest('.edit-message-btn')) {
+                        return;
+                    }
+                    
+                    const now = Date.now();
+                    if (now - lastBubbleTap < 300) {
+                        // Double tap detected - toggle favorite
+                        toggleFavorite(msgID, text, msg.info.role);
+                    }
+                    lastBubbleTap = now;
+                });
+            }
+            
+            // Add favorite button
+            if (msgID && text) {
+                const favoriteBtn = document.createElement('button');
+                favoriteBtn.className = 'favorite-btn';
+                favoriteBtn.textContent = favoriteMessages.has(msgID) ? '⭐' : '☆';
+                if (favoriteMessages.has(msgID)) favoriteBtn.classList.add('favorited');
+                favoriteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleFavorite(msgID, text, msg.info.role);
+                };
+                bubble.appendChild(favoriteBtn);
+            }
             
             if (msg.info.agent || msg.info.modelID || msg.info.role === 'user') {
                 const infoBar = document.createElement('div');
@@ -2187,14 +2891,42 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
     const modelStr = customModel !== null ? customModel : (qsModelSelect ? qsModelSelect.value : undefined);
     const model = (modelStr && modelStr !== "") ? JSON.parse(modelStr) : undefined;
 
+    // Check model priority before sending
+    if (model) {
+        const shouldContinue = await checkModelPriority(model);
+        if (!shouldContinue) {
+            if (sendBtn) sendBtn.disabled = false;
+            return;
+        }
+    }
+
+    // Get agent's custom prompt if configured
+    let prompt = undefined;
+    if (agent) {
+        try {
+            const config = await fetch('/api/config').then(r => r.json());
+            if (config.agent && config.agent[agent] && config.agent[agent].prompt) {
+                prompt = config.agent[agent].prompt;
+                console.log('[DEBUG] Using custom prompt for agent:', agent);
+            }
+        } catch (error) {
+            console.error('Failed to fetch agent config:', error);
+        }
+    }
+
     addMessage('user', text, false, false, false, false, { agent, modelID: model?.modelID, providerID: model?.providerID });
     addTypingIndicator('assistant-typing');
     
     try {
+        const payload = { text, agent, model };
+        if (prompt) {
+            payload.prompt = prompt;
+        }
+        
         const response = await fetch(`/api/session/${currentSession.id}/message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, agent, model })
+            body: JSON.stringify(payload)
         });
         
         if (!response.ok) {
@@ -2262,6 +2994,26 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${role}`;
     if (msgID) bubble.id = 'msg-' + msgID;
+    
+    // Add double-tap to favorite on message bubbles
+    if (msgID && text) {
+        let lastBubbleTap = 0;
+        bubble.addEventListener('click', (e) => {
+            // Don't trigger if clicking the favorite button or edit button
+            if (e.target.classList.contains('favorite-btn') || 
+                e.target.classList.contains('edit-message-btn') ||
+                e.target.closest('.edit-message-btn')) {
+                return;
+            }
+            
+            const now = Date.now();
+            if (now - lastBubbleTap < 300) {
+                // Double tap detected - toggle favorite
+                toggleFavorite(msgID, text, role);
+            }
+            lastBubbleTap = now;
+        });
+    }
     
     // Add favorite button
     if (msgID && text) {
@@ -2523,13 +3275,21 @@ function addEvent(type, data) {
 
 function addTypingIndicator(id) {
     const typingArea = document.getElementById('typingIndicatorArea');
-    if (!typingArea) return;
+    console.log('[DEBUG] addTypingIndicator called:', id, 'typingArea:', typingArea);
+    if (!typingArea) {
+        console.error('[DEBUG] Typing area not found!');
+        return;
+    }
     
     // Check if indicator already exists
-    if (document.getElementById(id)) return;
+    if (document.getElementById(id)) {
+        console.log('[DEBUG] Indicator already exists:', id);
+        return;
+    }
     
     // Show the typing area
     typingArea.style.display = 'block';
+    console.log('[DEBUG] Set display to block, current display:', typingArea.style.display);
     
     // Add class to messages container for padding
     if (messagesContainer) messagesContainer.classList.add('with-typing');
@@ -2539,19 +3299,25 @@ function addTypingIndicator(id) {
     indicator.className = 'typing-indicator';
     indicator.innerHTML = '<span></span><span></span><span></span>';
     typingArea.appendChild(indicator);
+    console.log('[DEBUG] Appended indicator, children count:', typingArea.children.length);
     
     // Scroll messages to bottom
     if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 function removeTypingIndicator(id) {
+    console.log('[DEBUG] removeTypingIndicator called:', id);
     const indicator = document.getElementById(id);
-    if (indicator) indicator.remove();
+    if (indicator) {
+        indicator.remove();
+        console.log('[DEBUG] Removed indicator:', id);
+    }
     
     // Hide typing area if no more indicators
     const typingArea = document.getElementById('typingIndicatorArea');
     if (typingArea && typingArea.children.length === 0) {
         typingArea.style.display = 'none';
+        console.log('[DEBUG] Hiding typing area');
         if (messagesContainer) messagesContainer.classList.remove('with-typing');
     }
 }
@@ -3021,12 +3787,25 @@ async function loadExistingSessions(search = '') {
         
         sessionList.innerHTML = '';
         if (filteredSessions.length === 0) { sessionList.innerHTML = '<div style="padding: 20px; text-align: center; color: #90949c;">No sessions found</div>'; return; }
+        
+        // Sort sessions by time.updated descending (most recent first)
+        filteredSessions.sort((a, b) => {
+            const timeA = a.time?.updated || a.time?.created || 0;
+            const timeB = b.time?.updated || b.time?.created || 0;
+            return timeB - timeA;
+        });
+        
         const groups = {};
         filteredSessions.forEach(s => {
             const d = new Date(s.time.updated).toDateString();
             if (!groups[d]) groups[d] = []; groups[d].push(s);
         });
-        Object.entries(groups).forEach(([d, ss]) => {
+        
+        // Sort date groups by most recent first
+        const sortedDates = Object.keys(groups).sort((a, b) => new Date(b) - new Date(a));
+        
+        sortedDates.forEach(d => {
+            const ss = groups[d];
             const h = document.createElement('div'); h.className = 'session-group-header'; h.textContent = d; sessionList.appendChild(h);
             ss.forEach(s => {
                 const item = document.createElement('div'); item.className = 'session-item';

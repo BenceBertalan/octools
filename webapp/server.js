@@ -14,6 +14,16 @@ const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes
 
 // Store active sessions and their clients
 const sessions = new Map();
+
+// In-memory config storage (until OpenCode server supports global config)
+let globalConfig = {
+  agent: {},
+  model_priority: {
+    enabled: false,
+    models: []
+  }
+};
+
 const octoolsClient = new OctoolsClient({
   baseUrl: OPENCODE_URL,
   autoConnect: true,
@@ -39,10 +49,33 @@ app.use(express.static(path.join(__dirname, 'public')));
 // API Routes
 app.get('/api/agents', async (req, res) => {
   try {
-    const response = await fetch(`${OPENCODE_URL}/config`);
-    const config = await response.json();
-    const agents = config.agent ? Object.keys(config.agent) : [];
+    const agents = await octoolsClient.getAgents();
     res.json(agents);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get global config
+app.get('/api/config', async (req, res) => {
+  try {
+    res.json(globalConfig);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update global config
+app.patch('/api/config', async (req, res) => {
+  try {
+    // Merge the updates into global config
+    if (req.body.agent) {
+      globalConfig.agent = { ...globalConfig.agent, ...req.body.agent };
+    }
+    if (req.body.model_priority) {
+      globalConfig.model_priority = { ...globalConfig.model_priority, ...req.body.model_priority };
+    }
+    res.json(globalConfig);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -157,8 +190,16 @@ app.get('/api/session/:sessionID/messages', async (req, res) => {
 app.post('/api/session/:sessionID/message', async (req, res) => {
   console.log(`[API] Message to session ${req.params.sessionID}:`, req.body.text?.substring(0, 50));
   try {
-    const { text, agent, model } = req.body;
-    const message = await octoolsClient.sendMessage(req.params.sessionID, text, { agent, model });
+    const { text, agent, model, prompt } = req.body;
+    const options = { agent, model };
+    
+    // Include prompt if provided
+    if (prompt) {
+      options.prompt = prompt;
+      console.log(`[API] Using custom prompt for agent ${agent}`);
+    }
+    
+    const message = await octoolsClient.sendMessage(req.params.sessionID, text, options);
     
     // Update activity
     const monitor = sessions.get(req.params.sessionID);

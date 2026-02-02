@@ -136,3 +136,91 @@ export interface SessionRetryFailedEvent {
   sessionID: string;
   error: string;
 }
+
+// Agent types
+export interface AgentInfo {
+  name: string;
+  description?: string;
+  mode: 'subagent' | 'primary' | 'all';
+  native?: boolean;
+  hidden?: boolean;
+  topP?: number;
+  temperature?: number;
+  color?: string;
+  model?: {
+    modelID: string;
+    providerID: string;
+  };
+  prompt?: string;
+  options?: Record<string, any>;
+  steps?: number;
+  permission?: any;
+}
+
+// Config types
+export interface AgentConfig {
+  model?: string;
+  temperature?: number;
+  top_p?: number;
+  prompt?: string;
+  disable?: boolean;
+  description?: string;
+  mode?: 'subagent' | 'primary' | 'all';
+  hidden?: boolean;
+  options?: Record<string, any>;
+  color?: string;
+  steps?: number;
+  permission?: any;
+}
+
+export interface ModelPriorityConfig {
+  enabled: boolean;
+  models: string[];
+}
+
+export interface GlobalConfig {
+  model?: string;
+  small_model?: string;
+  default_agent?: string;
+  agent?: Record<string, AgentConfig>;
+  model_priority?: ModelPriorityConfig;
+  [key: string]: any;
+}
+
+// Provider/Model types
+export interface ModelCost {
+  input: number;
+  output: number;
+  cache?: {
+    read: number;
+    write: number;
+  };
+}
+
+export interface ModelInfo {
+  id: string;
+  providerID: string;
+  name: string;
+  family?: string;
+  cost: ModelCost;
+  limit: {
+    context: number;
+    input?: number;
+    output: number;
+  };
+  status?: 'alpha' | 'beta' | 'deprecated' | 'active';
+  release_date?: string;
+  capabilities?: any;
+}
+
+export interface ProviderInfo {
+  id: string;
+  name: string;
+  models: Record<string, ModelInfo>;
+}
+
+export interface ProviderListResponse {
+  all: ProviderInfo[];
+  default: Record<string, string>;
+  connected: string[];
+}

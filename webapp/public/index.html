@@ -56,97 +56,102 @@
             </button>
         </div>
 
-        <!-- Chat Tab -->
-        <div class="tab-content active" id="chatTab">
-            <div class="messages-container" id="messagesContainer">
-                <div class="welcome-message">
-                    <h2>Welcome to OpenCode Chat</h2>
-                    <p>Select a model/agent and start chatting</p>
-                </div>
-            </div>
-            
-            <!-- Fixed Typing Indicator Area -->
-            <div class="typing-indicator-area" id="typingIndicatorArea" style="display: none;"></div>
-            
-            <!-- Quick Settings Bar -->
-            <div class="quick-settings">
-                <div class="qs-item">
-                    <select id="qsAgentSelect" title="Change Agent">
-                        <option value="">Agent: Default</option>
-                    </select>
-                </div>
-                <div class="qs-item">
-                    <select id="qsModelSelect" title="Change Model">
-                        <option value="">Model: Default</option>
-                    </select>
-                </div>
-                <button id="sendBtn" disabled>➤</button>
-            </div>
-            
-            <div class="input-container" id="inputContainer">
-                <!-- Simple Mode Input -->
-                <div class="simple-input-wrapper" id="simpleInputWrapper">
-                    <textarea 
-                        id="messageInput" 
-                        placeholder="Type a message..." 
-                        rows="1"
-                    ></textarea>
-                    <button id="toggleRichBtn" class="toggle-rich-btn" title="Switch to Rich Editor">📝</button>
-                </div>
-
-                <!-- Rich Mode Input -->
-                <div class="rich-input-wrapper" id="richInputWrapper" style="display: none;">
-                    <div class="markdown-toolbar" id="markdownToolbar">
-                        <button class="md-btn" data-format="bold" title="Bold">B</button>
-                        <button class="md-btn" data-format="italic" title="Italic">I</button>
-                        <button class="md-btn" data-format="code" title="Inline Code">C</button>
-                        <button class="md-btn" data-format="codeblock" title="Code Block">`</button>
-                        <button class="md-btn" data-format="heading" title="Heading">#</button>
-                        <button class="md-btn" data-format="list" title="List">L</button>
-                        <button class="md-btn" data-format="indent" title="Increase Indent">→</button>
-                        <button class="md-btn" data-format="outdent" title="Decrease Indent">←</button>
-                        <div class="toolbar-spacer"></div>
-                        <button id="toggleSimpleBtn" class="toggle-simple-btn">💾 Simple</button>
+        <!-- Tab Slider Container -->
+        <div class="tab-slider-wrapper">
+            <div class="tab-slider" id="tabSlider" data-active-tab="0">
+                <!-- Chat Tab -->
+                <div class="tab-content active" id="chatTab" data-tab-index="0">
+                    <div class="messages-container" id="messagesContainer">
+                        <div class="welcome-message">
+                            <h2>Welcome to OpenCode Chat</h2>
+                            <p>Select a model/agent and start chatting</p>
+                        </div>
                     </div>
-                    <div 
-                        id="richEditor" 
-                        class="rich-editor" 
-                        contenteditable="true" 
-                        data-placeholder="Type a message with formatting..."
-                    ></div>
-                </div>
+                    
+                    <!-- Fixed Typing Indicator Area -->
+                    <div class="typing-indicator-area" id="typingIndicatorArea" style="display: none;"></div>
+                    
+                    <!-- Quick Settings Bar -->
+                    <div class="quick-settings">
+                        <div class="qs-item">
+                            <select id="qsAgentSelect" title="Change Agent">
+                                <option value="">Agent: Default</option>
+                            </select>
+                        </div>
+                        <div class="qs-item">
+                            <select id="qsModelSelect" title="Change Model">
+                                <option value="">Model: Default</option>
+                            </select>
+                        </div>
+                        <button id="sendBtn" disabled>➤</button>
+                    </div>
+                    
+                    <div class="input-container" id="inputContainer">
+                        <!-- Simple Mode Input -->
+                        <div class="simple-input-wrapper" id="simpleInputWrapper">
+                            <textarea 
+                                id="messageInput" 
+                                placeholder="Type a message..." 
+                                rows="1"
+                            ></textarea>
+                            <button id="toggleRichBtn" class="toggle-rich-btn" title="Switch to Rich Editor">📝</button>
+                        </div>
 
-                <button id="abortBtn" title="Abort" style="background: var(--error-color); display: none;">🛑</button>
-            </div>
-        </div>
+                        <!-- Rich Mode Input -->
+                        <div class="rich-input-wrapper" id="richInputWrapper" style="display: none;">
+                            <div class="markdown-toolbar" id="markdownToolbar">
+                                <button class="md-btn" data-format="bold" title="Bold">B</button>
+                                <button class="md-btn" data-format="italic" title="Italic">I</button>
+                                <button class="md-btn" data-format="code" title="Inline Code">C</button>
+                                <button class="md-btn" data-format="codeblock" title="Code Block">`</button>
+                                <button class="md-btn" data-format="heading" title="Heading">#</button>
+                                <button class="md-btn" data-format="list" title="List">L</button>
+                                <button class="md-btn" data-format="indent" title="Increase Indent">→</button>
+                                <button class="md-btn" data-format="outdent" title="Decrease Indent">←</button>
+                                <div class="toolbar-spacer"></div>
+                                <button id="toggleSimpleBtn" class="toggle-simple-btn">💾 Simple</button>
+                            </div>
+                            <div 
+                                id="richEditor" 
+                                class="rich-editor" 
+                                contenteditable="true" 
+                                data-placeholder="Type a message with formatting..."
+                            ></div>
+                        </div>
 
-        <!-- Tools Tab -->
-        <div class="tab-content" id="toolsTab">
-            <div class="tools-header" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h3 style="margin: 0; font-size: 16px;">Agent & Tool Activity</h3>
-                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                        <span id="toolsActiveCount">0 active</span> · <span id="toolsCompletedCount">0 completed</span>
+                        <button id="abortBtn" title="Abort" style="background: var(--error-color); display: none;">🛑</button>
                     </div>
                 </div>
-                <button class="btn-secondary" style="padding: 4px 12px; font-size: 12px;" id="clearToolsBtn">Clear All</button>
-            </div>
-            <div class="tools-container" id="toolsContainer">
-                <div class="tools-empty-state">
-                    <div style="font-size: 48px; margin-bottom: 16px;">🔧</div>
-                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No Tools Running</div>
-                    <div style="font-size: 13px; color: #666;">Agent and tool activity will appear here</div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Events Tab -->
-        <div class="tab-content" id="eventsTab">
-            <div class="events-container" id="eventsContainer">
-                <div class="event-item">
-                    <div class="event-header">System</div>
-                    <div class="event-body">Waiting for events...</div>
-                    <div class="event-time" id="initialEventTime"></div>
+                <!-- Events Tab -->
+                <div class="tab-content" id="eventsTab" data-tab-index="1">
+                    <div class="events-container" id="eventsContainer">
+                        <div class="event-item">
+                            <div class="event-header">System</div>
+                            <div class="event-body">Waiting for events...</div>
+                            <div class="event-time" id="initialEventTime"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tools Tab -->
+                <div class="tab-content" id="toolsTab" data-tab-index="2">
+                    <div class="tools-header" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 16px;">Agent & Tool Activity</h3>
+                            <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                                <span id="toolsActiveCount">0 active</span> · <span id="toolsCompletedCount">0 completed</span>
+                            </div>
+                        </div>
+                        <button class="btn-secondary" style="padding: 4px 12px; font-size: 12px;" id="clearToolsBtn">Clear All</button>
+                    </div>
+                    <div class="tools-container" id="toolsContainer">
+                        <div class="tools-empty-state">
+                            <div style="font-size: 48px; margin-bottom: 16px;">🔧</div>
+                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No Tools Running</div>
+                            <div style="font-size: 13px; color: #666;">Agent and tool activity will appear here</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -253,6 +258,152 @@
                         <div class="log-item">No logs captured yet.</div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Modal -->
+    <div class="modal" id="menuModal">
+        <div class="modal-content menu-modal-content">
+            <div class="modal-header">
+                <h3>Menu</h3>
+                <button class="close-btn" id="closeMenu">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="menu-items">
+                    <button class="menu-item" id="menuSessionSettings">
+                        <span class="menu-icon">⚙️</span>
+                        <span class="menu-label">Session Settings</span>
+                    </button>
+                    <button class="menu-item" id="menuAgentSettings">
+                        <span class="menu-icon">🤖</span>
+                        <span class="menu-label">Agent & Model Settings</span>
+                    </button>
+                    <button class="menu-item" id="menuModelPriority">
+                        <span class="menu-icon">⭐</span>
+                        <span class="menu-label">Model Priority</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Settings Modal -->
+    <div class="modal" id="agentSettingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Agent & Model Settings</h3>
+                <button class="close-btn" id="closeAgentSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="agentSettingsSelect">Select Agent</label>
+                    <select id="agentSettingsSelect">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agentModelSelect">Default Model (override)</label>
+                    <select id="agentModelSelect">
+                        <option value="">Use agent default</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agentTemperature">Temperature</label>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <input type="range" id="agentTemperature" min="0" max="2" step="0.1" value="0.7" style="flex: 1;">
+                        <span id="agentTemperatureValue" style="min-width: 40px; font-family: monospace; font-size: 14px;">0.7</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agentTopP">Top P</label>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <input type="range" id="agentTopP" min="0" max="1" step="0.05" value="1" style="flex: 1;">
+                        <span id="agentTopPValue" style="min-width: 40px; font-family: monospace; font-size: 14px;">1.0</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agentPrompt">Custom Prompt (optional)</label>
+                    <textarea id="agentPrompt" rows="4" placeholder="Enter custom system prompt..."></textarea>
+                </div>
+                
+                <div class="form-actions" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+                    <button class="btn-secondary" id="resetAgentSettings">Reset to Default</button>
+                    <button class="btn-primary" id="saveAgentSettings">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Priority Modal -->
+    <div class="modal" id="modelPriorityModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Model Priority</h3>
+                <button class="close-btn" id="closeModelPriority">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="enableCostWarnings">
+                        <span class="toggle-text">Enable cost warnings</span>
+                    </label>
+                    <small style="color: #90949c; font-size: 12px; margin-top: 4px; display: block;">
+                        Warn before using models outside your priority list
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Your Priority Models</label>
+                    <div class="priority-list" id="priorityList">
+                        <div style="text-align: center; padding: 20px; color: #999;">
+                            No models added yet. Add models below.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Add Model</label>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="addModelSelect" style="flex: 1;">
+                            <option value="">Select a model...</option>
+                        </select>
+                        <button class="btn-secondary" id="addModelBtn">Add</button>
+                    </div>
+                </div>
+                
+                <button class="btn-primary" id="saveModelPriority" style="width: 100%;">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Warning Modal -->
+    <div class="modal" id="costWarningModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ Model Selection</h3>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 10px;">You're about to use: <strong id="cwCurrentModel" style="font-family: monospace;"></strong></p>
+                <p style="margin-bottom: 15px; color: #666;">This model is not in your priority list. Would you like to switch to a preferred model?</p>
+                
+                <div class="model-choices" id="modelChoices" style="margin-bottom: 20px;">
+                    <!-- Radio buttons for priority models will be inserted here -->
+                </div>
+                
+                <div class="form-actions" style="gap: 10px;">
+                    <button class="btn-primary" id="cwUseSelected">Use Selected Model</button>
+                    <button class="btn-secondary" id="cwContinue">Continue with Current</button>
+                </div>
+                
+                <label class="toggle-label" style="margin-top: 20px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="cwDontAskAgain" style="cursor: pointer;">
+                    <span style="font-size: 14px;">Don't ask again this session</span>
+                </label>
             </div>
         </div>
     </div>
