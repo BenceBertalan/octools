@@ -165,7 +165,7 @@ body {
     padding: 10px 14px;
     border-radius: 18px;
     font-size: 14.25px; /* 5% smaller than 15px */
-    line-height: 1.4;
+    line-height: 1.2; /* 50% smaller vertical spacing */
     position: relative;
     margin-bottom: 4px;
     /* Enhanced word wrapping to prevent overflow */
