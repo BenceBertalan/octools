@@ -179,6 +179,65 @@ body {
     font-size: 20px;
 }
 
+/* Loading Overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+body.dark-theme .loading-overlay {
+    background: rgba(24, 24, 27, 0.95);
+}
+
+.loading-content {
+    text-align: center;
+    padding: 30px;
+    max-width: 400px;
+    width: 90%;
+}
+
+.loading-text {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: var(--text-color);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+body.dark-theme .progress-bar {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary-color);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.loading-stats {
+    font-size: 13px;
+    color: #90949c;
+    font-family: monospace;
+}
+
 .message-bubble {
     max-width: 75%;
     padding: 10px 14px;
@@ -1075,6 +1134,22 @@ body.dark .form-group select, body.dark .qs-item select {
 }
 
 .session-item-date { font-size: 11px; color: #90949c; }
+
+.session-item-meta { 
+    font-size: 11px; 
+    color: #90949c; 
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.session-status-text {
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
 
 .btn-primary {
     background: var(--primary-color);

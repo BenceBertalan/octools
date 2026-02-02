@@ -85,6 +85,9 @@ const messageInput = getEl('messageInput');
 const sendBtn = getEl('sendBtn');
 const abortBtn = getEl('abortBtn');
 const messagesContainer = getEl('messagesContainer');
+const loadingOverlay = getEl('loadingOverlay');
+const progressFill = getEl('progressFill');
+const loadingStats = getEl('loadingStats');
 const eventsContainer = getEl('eventsContainer');
 const logsContainer = getEl('logsContainer');
 const logCount = getEl('logCount');
@@ -2788,8 +2791,42 @@ async function loadExistingSessions(search = '') {
             ss.forEach(s => {
                 const item = document.createElement('div'); item.className = 'session-item';
                 const status = sessionStatuses.get(s.id) || 'idle';
-                const busyIndicator = status === 'busy' ? '<span class="session-busy-indicator">●</span>' : '';
-                item.innerHTML = `<div class="session-item-title">${busyIndicator}${s.title || s.id.substring(0, 12)}</div><div class="session-item-date">${new Date(s.time.updated).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+                
+                // Status indicator with color
+                let statusIndicator = '';
+                let statusText = '';
+                if (status === 'busy') {
+                    statusIndicator = '<span class="session-busy-indicator">●</span>';
+                    statusText = '<span class="session-status-text" style="color: #3b82f6;">busy</span>';
+                } else if (status === 'error') {
+                    statusIndicator = '<span class="session-busy-indicator" style="color: #ef4444;">●</span>';
+                    statusText = '<span class="session-status-text" style="color: #ef4444;">error</span>';
+                } else {
+                    statusText = '<span class="session-status-text" style="color: #10b981;">idle</span>';
+                }
+                
+                // Format last updated time
+                const updatedDate = new Date(s.time.updated);
+                const now = new Date();
+                const diffMs = now - updatedDate;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+                
+                let lastUpdated = '';
+                if (diffMins < 1) lastUpdated = 'just now';
+                else if (diffMins < 60) lastUpdated = `${diffMins}m ago`;
+                else if (diffHours < 24) lastUpdated = `${diffHours}h ago`;
+                else if (diffDays === 1) lastUpdated = 'yesterday';
+                else lastUpdated = updatedDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                
+                // Build session item with enhanced info
+                item.innerHTML = `
+                    <div class="session-item-title">${statusIndicator}${s.title || s.id.substring(0, 12)}</div>
+                    <div class="session-item-meta">
+                        ${statusText} • ${lastUpdated}
+                    </div>
+                `;
                 item.onclick = () => connectToSession(s); sessionList.appendChild(item);
             });
         });
@@ -2813,11 +2850,21 @@ async function connectToSession(session) {
         renderDiffDrawer(diffs);
     }
     
+    // Clear messages container and show loading overlay
+    if (messagesContainer) messagesContainer.innerHTML = '';
+    if (loadingOverlay) loadingOverlay.style.display = 'flex';
+    if (progressFill) progressFill.style.width = '0%';
+    if (loadingStats) loadingStats.textContent = '0 / 0';
+    
     try {
         // Fetch all messages without limit
         const response = await fetch(`/api/session/${session.id}/messages`);
         if (!response.ok) throw new Error('Failed to fetch messages');
         const allMessages = await safeJson(response) || [];
+        
+        // Update progress: fetched all messages
+        if (loadingStats) loadingStats.textContent = `Fetched ${allMessages.length} messages`;
+        if (progressFill) progressFill.style.width = '25%';
         
         // Cache messages
         messagesCache.set(session.id, allMessages);
@@ -2830,17 +2877,25 @@ async function connectToSession(session) {
         // Store oldest displayed index
         oldestDisplayedIndex.set(session.id, startIndex);
         
+        // Update progress: processing messages
+        if (progressFill) progressFill.style.width = '50%';
+        
         if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
         updateStatus('idle'); 
         if (settingsModal) settingsModal.classList.remove('active');
-        if (messagesContainer) messagesContainer.innerHTML = '';
         
         // Add "Load More" button if there are more messages
         if (startIndex > 0) {
             updateLoadMoreButton(false, true);
         }
         
-        messagesToShow.forEach(msg => {
+        // Update progress: rendering messages
+        if (progressFill) progressFill.style.width = '75%';
+        
+        // Render messages with progress updates
+        let processedCount = 0;
+        for (let i = 0; i < messagesToShow.length; i++) {
+            const msg = messagesToShow[i];
             const textParts = msg.parts.filter(p => p.type === 'text');
             const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
             const todoParts = msg.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
@@ -2864,8 +2919,25 @@ async function connectToSession(session) {
             if (text || reasoningParts.length > 0 || todoParts.length > 0) {
                 addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts, todoParts);
             }
-        });
-    } catch (e) { addEvent('Error', 'Connect failed: ' + e.message); }
+            
+            processedCount++;
+            if (loadingStats) loadingStats.textContent = `Loading ${processedCount} / ${messagesToShow.length}`;
+            
+            // Update progress during rendering
+            const renderProgress = 75 + (processedCount / messagesToShow.length) * 25;
+            if (progressFill) progressFill.style.width = `${renderProgress}%`;
+        }
+        
+        // Complete - hide loading overlay
+        if (progressFill) progressFill.style.width = '100%';
+        setTimeout(() => {
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+        }, 300);
+        
+    } catch (e) { 
+        addEvent('Error', 'Connect failed: ' + e.message);
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+    }
 }
 
 async function loadSessionHistory(id) {
