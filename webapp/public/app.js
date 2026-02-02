@@ -32,7 +32,7 @@ function formatSelectiveMarkdown(text) {
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
     
-    // Format italic (*text* or _text_)
+    // Format italic (*text* or _text_) - be careful not to match list markers
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
     html = html.replace(/_(.+?)_/g, '<em>$1</em>');
     
@@ -40,6 +40,19 @@ function formatSelectiveMarkdown(text) {
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    
+    // Format unordered lists (-, *, +)
+    // Match lines starting with -, *, or + followed by space
+    html = html.replace(/^([*\-+]) (.+)$/gm, '<li>$2</li>');
+    
+    // Format ordered lists (1., 2., etc.)
+    html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+    
+    // Wrap consecutive <li> tags in <ul> or <ol>
+    // This handles unordered lists
+    html = html.replace(/(<li>.*?<\/li>\n?)+/g, function(match) {
+        return '<ul>' + match + '</ul>';
+    });
     
     // Convert newlines to <br> for display
     html = html.replace(/\n/g, '<br>');
