@@ -382,6 +382,21 @@ body.dark .message-content h1 {
     border-bottom-color: rgba(255, 255, 255, 0.2);
 }
 
+/* Selective markdown formatting - Bold and Italic */
+.message-content strong {
+    font-weight: 700;
+}
+
+.message-content em {
+    font-style: italic;
+}
+
+.message-content strong em,
+.message-content em strong {
+    font-weight: 700;
+    font-style: italic;
+}
+
 /* Fix for code blocks and inline code in markdown */
 .message-bubble pre,
 .message-bubble code {

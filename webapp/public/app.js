@@ -16,13 +16,25 @@ function formatSelectiveMarkdown(text) {
     // Escape HTML to prevent injection
     html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     
-    // Format code blocks (```language\ncode\n```)
+    // Format code blocks (```language\ncode\n```) - MUST come before inline code
     html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, function(match, lang, code) {
         return '<pre><code class="language-' + (lang || 'text') + '">' + code.trim() + '</code></pre>';
     });
     
-    // Format inline code (`code`)
+    // Format inline code (`code`) - MUST come before bold/italic to avoid conflicts
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Format bold + italic (***text*** or ___text___)
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/___(.+?)___/g, '<strong><em>$1</em></strong>');
+    
+    // Format bold (**text** or __text__)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    
+    // Format italic (*text* or _text_)
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/_(.+?)_/g, '<em>$1</em>');
     
     // Format headings (# Heading)
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
