@@ -1437,7 +1437,6 @@ function updateProgressBubble(bubble, agent, task, status) {
                 const newElapsed = Math.floor((Date.now() - startTime) / 1000);
                 timer.textContent = `⏱️ ${newElapsed}s`;
             }
-            }
         }, 1000);
         bubble.dataset.timerInterval = intervalId;
     }
