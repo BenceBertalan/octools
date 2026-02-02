@@ -15,6 +15,9 @@ let loadingMore = false;
 // Reasoning state
 let reasoningExpanded = new Map(); // messageID -> boolean
 
+// Tool/Agent outputs
+let toolOutputs = new Map(); // progressID -> {agent, task, output}
+
 // Progress bubbles state
 const progressBubbles = new Map(); // Map<messageID, Map<partID, bubbleElement>>
 const completedTools = new Map();  // Map<messageID, Array<toolName>>
@@ -845,6 +848,13 @@ async function safeJson(response) {
 function createReasoningSection(reasoningParts, messageID) {
     if (!reasoningParts || reasoningParts.length === 0) return null;
     
+    // Check if reasoning should be shown based on settings
+    const showReasoning = getCookie('showReasoning');
+    if (showReasoning === 'false') {
+        // User has explicitly turned off reasoning, don't create the section at all
+        return null;
+    }
+    
     const reasoningText = reasoningParts.map(p => p.text).filter(Boolean).join('\n\n');
     if (!reasoningText) return null;
     
@@ -852,7 +862,6 @@ function createReasoningSection(reasoningParts, messageID) {
     section.className = 'reasoning-section';
     
     // Get default state from cookie - show reasoning is now the preference
-    const showReasoning = getCookie('showReasoning');
     const showByDefault = showReasoning === 'true'; // Default is false (hidden)
     const isExpanded = reasoningExpanded.get(messageID) ?? showByDefault;
     
@@ -1009,9 +1018,9 @@ async function loadMoreMessages() {
             if (msg.info.agent || msg.info.modelID) {
                 const infoBar = document.createElement('div');
                 infoBar.className = 'message-info-bar';
-                const agentName = msg.info.agent || 'Default';
+                const agentName = msg.info.agent || (msg.info.role === 'user' ? 'User' : 'Assistant');
                 const modelName = msg.info.modelID ? `${msg.info.providerID ? msg.info.providerID + '/' : ''}${msg.info.modelID}` : '';
-                infoBar.innerHTML = `<span>🤖 ${agentName}</span>${modelName ? `<span class="model-tag">🧠 ${modelName}</span>` : ''}`;
+                infoBar.innerHTML = `<span class="agent-tag">${msg.info.role === 'user' ? '👤' : '🤖'} ${agentName}</span>${modelName ? `<span class="model-tag">${modelName}</span>` : ''}`;
                 bubble.appendChild(infoBar);
             }
             
@@ -1453,10 +1462,10 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
         if (metadata && (metadata.agent || metadata.modelID)) {
             const infoBar = document.createElement('div');
             infoBar.className = 'message-info-bar';
-            const agentName = metadata.agent || 'Default';
+            const agentName = metadata.agent || 'Assistant';
             const modelName = metadata.modelID ? `${metadata.providerID ? metadata.providerID + '/' : ''}${metadata.modelID}` : '';
-            infoBar.innerHTML = `<span>🤖 ${agentName}</span>${modelName ? `<span class="model-tag">🧠 ${modelName}</span>` : ''}`;
-            streamMsg.appendChild(infoBar);
+            infoBar.innerHTML = `<span class="agent-tag">🤖 ${agentName}</span>${modelName ? `<span class="model-tag">${modelName}</span>` : ''}`;
+            bubble.appendChild(infoBar);
         }
 
         const content = document.createElement('div');
@@ -1485,12 +1494,12 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     bubble.className = `message-bubble ${role}`;
     if (msgID) bubble.id = 'msg-' + msgID;
     
-    if (metadata && (metadata.agent || metadata.modelID)) {
+    if (metadata && (metadata.agent || metadata.modelID || role === 'user')) {
         const infoBar = document.createElement('div');
         infoBar.className = 'message-info-bar';
-        const agentName = metadata.agent || 'Default';
+        const agentName = metadata.agent || (role === 'user' ? 'User' : 'Assistant');
         const modelName = metadata.modelID ? `${metadata.providerID ? metadata.providerID + '/' : ''}${metadata.modelID}` : '';
-        infoBar.innerHTML = `<span>🤖 ${agentName}</span>${modelName ? `<span class="model-tag">🧠 ${modelName}</span>` : ''}`;
+        infoBar.innerHTML = `<span class="agent-tag">${role === 'user' ? '👤' : '🤖'} ${agentName}</span>${modelName ? `<span class="model-tag">${modelName}</span>` : ''}`;
         bubble.appendChild(infoBar);
     }
 
@@ -1719,7 +1728,7 @@ function removeTypingIndicator(id) {
 }
 
 function updateSubagentProgress(data) {
-    const { messageID, partID, agent, task, status } = data;
+    const { messageID, partID, agent, task, status, output } = data;
     const progressID = `progress-${messageID}-${partID}`;
     let progressEl = document.getElementById(progressID);
     if (!progressEl) {
@@ -1732,9 +1741,35 @@ function updateSubagentProgress(data) {
     }
     if (progressEl) {
         const icon = status === 'running' ? '⏳' : status === 'completed' ? '✅' : status === 'error' ? '❌' : '⚪';
-        progressEl.innerHTML = `<span class="pill-icon ${status === 'running' ? 'spinning' : ''}">${icon}</span> <span class="pill-agent">${agent}</span>: <span class="pill-task">${task}</span>`;
+        const toolName = agent || 'Tool';
+        progressEl.innerHTML = `<span class="pill-icon ${status === 'running' ? 'spinning' : ''}">${icon}</span> <span class="pill-agent">${toolName}</span>: <span class="pill-task">${task}</span>`;
         progressEl.className = `subagent-pill ${status}`;
+        
+        // Store output if available
+        if (output && (status === 'completed' || status === 'error')) {
+            toolOutputs.set(progressID, { agent: toolName, task, output, status });
+            
+            // Add click handler for completed/error states
+            progressEl.style.cursor = 'pointer';
+            progressEl.onclick = () => showToolOutput(progressID);
+        }
+        
         if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+
+function showToolOutput(progressID) {
+    const data = toolOutputs.get(progressID);
+    if (!data) return;
+    
+    const modal = document.getElementById('toolOutputModal');
+    const title = document.getElementById('toolOutputTitle');
+    const content = document.getElementById('toolOutputContent');
+    
+    if (modal && title && content) {
+        title.textContent = `${data.agent}: ${data.task}`;
+        content.textContent = typeof data.output === 'string' ? data.output : JSON.stringify(data.output, null, 2);
+        modal.style.display = 'flex';
     }
 }
 

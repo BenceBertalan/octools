@@ -292,6 +292,19 @@
     <!-- Toast Notification Container -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- Tool/Agent Output Modal -->
+    <div class="modal" id="toolOutputModal">
+        <div class="modal-content" style="max-width: 80%; max-height: 80%;">
+            <div class="modal-header">
+                <h3 id="toolOutputTitle">Tool Output</h3>
+                <button class="close-modal" onclick="document.getElementById('toolOutputModal').style.display='none'">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                <pre id="toolOutputContent" style="white-space: pre-wrap; word-wrap: break-word; font-family: monospace; font-size: 12px; background: #f5f5f5; padding: 10px; border-radius: 4px;"></pre>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
