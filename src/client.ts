@@ -22,6 +22,12 @@ export class OctoolsClient extends EventEmitter {
   private lastUserPrompts: Map<string, { text: string; options?: any }> = new Map();
   public rawEvents: { timestamp: number; payload: any }[] = [];
   private static MAX_LOGS = 2000;
+  
+  // Liveness monitoring
+  private livenessTimers: Map<string, any> = new Map();  // Use 'any' to avoid Timer type issues
+  private sessionRetryAttempts: Map<string, number> = new Map();
+  private readonly DEFAULT_LIVENESS_INTERVAL = 1000;  // 1 second
+  private readonly DEFAULT_SESSION_TIMEOUT = 30000;   // 30 seconds
 
   constructor(config: ClientConfig) {
     super();
@@ -103,6 +109,13 @@ export class OctoolsClient extends EventEmitter {
           
           if (status.type === 'busy' || status.type === 'retry') {
              this.recordAIActivity(sessionID);
+             // Start liveness monitoring when session becomes busy
+             if (prevStatus !== 'busy' && status.type === 'busy') {
+               this.startLivenessMonitoring(sessionID);
+             }
+          } else {
+             // Stop liveness monitoring when session is no longer busy
+             this.stopLivenessMonitoring(sessionID);
           }
 
           // Secondary model switching logic
@@ -544,9 +557,117 @@ export class OctoolsClient extends EventEmitter {
     if (status !== 'busy' && status !== 'retry') return true; // Not busy, so responsiveness is N/A (or true)
     
     const lastActivity = this.lastAIActivity.get(sessionID) || 0;
-    // If we never saw activity but it's busy, maybe it just started? 
-    // We should initialize lastActivity when status becomes busy.
+    if (lastActivity === 0) return true; // No activity yet is considered responsive
     
-    return (Date.now() - lastActivity) < thresholdMs;
+    const timeSinceActivity = Date.now() - lastActivity;
+    return timeSinceActivity < thresholdMs;
+  }
+
+  // --- Liveness Monitoring ---
+
+  private startLivenessMonitoring(sessionID: string): void {
+    // Clean up any existing timer
+    this.stopLivenessMonitoring(sessionID);
+    
+    const interval = this.config.livenessCheckInterval || this.DEFAULT_LIVENESS_INTERVAL;
+    const timeout = this.config.sessionTimeout || this.DEFAULT_SESSION_TIMEOUT;
+    
+    console.log(`[Octools] Starting liveness monitoring for session ${sessionID} (interval: ${interval}ms, timeout: ${timeout}ms)`);
+    
+    const timer = setInterval(() => {
+      this.checkSessionLiveness(sessionID, timeout);
+    }, interval);
+    
+    this.livenessTimers.set(sessionID, timer);
+  }
+
+  private stopLivenessMonitoring(sessionID: string): void {
+    const timer = this.livenessTimers.get(sessionID);
+    if (timer) {
+      clearInterval(timer);
+      this.livenessTimers.delete(sessionID);
+      console.log(`[Octools] Stopped liveness monitoring for session ${sessionID}`);
+    }
+  }
+
+  private checkSessionLiveness(sessionID: string, timeoutMs: number): void {
+    const status = this.getSessionStatus(sessionID);
+    
+    // Only check liveness for busy sessions
+    if (status !== 'busy') {
+      this.stopLivenessMonitoring(sessionID);
+      return;
+    }
+    
+    const lastActivity = this.lastAIActivity.get(sessionID) || Date.now();
+    const timeSinceActivity = Date.now() - lastActivity;
+    const secondsSinceLastEvent = Math.floor(timeSinceActivity / 1000);
+    const isStale = timeSinceActivity >= timeoutMs;
+    
+    // Emit liveness event
+    this.emit('session.liveness', {
+      sessionID,
+      secondsSinceLastEvent,
+      isStale
+    });
+    
+    // Handle timeout
+    if (isStale) {
+      console.log(`[Octools] Session ${sessionID} timed out after ${secondsSinceLastEvent} seconds`);
+      this.handleSessionTimeout(sessionID);
+    }
+  }
+
+  private async handleSessionTimeout(sessionID: string): Promise<void> {
+    // Stop monitoring during retry
+    this.stopLivenessMonitoring(sessionID);
+    
+    // Track retry attempts
+    const attempts = (this.sessionRetryAttempts.get(sessionID) || 0) + 1;
+    this.sessionRetryAttempts.set(sessionID, attempts);
+    
+    // Emit retry start event
+    this.emit('session.retry.start', {
+      sessionID,
+      reason: 'timeout',
+      attemptNumber: attempts
+    });
+    
+    try {
+      // Abort current session
+      console.log(`[Octools] Aborting stalled session ${sessionID}`);
+      await this.abortSession(sessionID);
+      
+      // Wait a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get the last user prompt
+      const lastPrompt = this.lastUserPrompts.get(sessionID);
+      if (!lastPrompt) {
+        throw new Error('No last prompt found for retry');
+      }
+      
+      // Resend the message
+      console.log(`[Octools] Retrying message for session ${sessionID}`);
+      await this.sendMessage(sessionID, lastPrompt.text, lastPrompt.options);
+      
+      // Success - reset retry counter
+      this.sessionRetryAttempts.set(sessionID, 0);
+      
+      // Emit success event
+      this.emit('session.retry.success', { sessionID });
+      
+    } catch (error: any) {
+      console.error(`[Octools] Retry failed for session ${sessionID}: ${error.message}`);
+      
+      // Emit failure event
+      this.emit('session.retry.failed', {
+        sessionID,
+        error: error.message
+      });
+      
+      // Update session status
+      this.sessionStatuses.set(sessionID, 'error');
+    }
   }
 }

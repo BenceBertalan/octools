@@ -2,6 +2,8 @@ export interface ClientConfig {
   baseUrl: string;
   password?: string;
   autoConnect?: boolean;
+  livenessCheckInterval?: number;  // Check interval in ms (default: 1000)
+  sessionTimeout?: number;          // Timeout in ms (default: 30000)
 }
 
 export type SessionStatusType = 'idle' | 'busy' | 'retry' | 'error';
@@ -111,4 +113,26 @@ export interface PermissionRequest {
   requestID: string;
   sessionID: string;
   // ...
+}
+
+// Liveness monitoring events
+export interface SessionLivenessEvent {
+  sessionID: string;
+  secondsSinceLastEvent: number;
+  isStale: boolean;
+}
+
+export interface SessionRetryStartEvent {
+  sessionID: string;
+  reason: 'timeout' | 'error' | 'manual';
+  attemptNumber?: number;
+}
+
+export interface SessionRetrySuccessEvent {
+  sessionID: string;
+}
+
+export interface SessionRetryFailedEvent {
+  sessionID: string;
+  error: string;
 }

@@ -16,7 +16,9 @@ const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes
 const sessions = new Map();
 const octoolsClient = new OctoolsClient({
   baseUrl: OPENCODE_URL,
-  autoConnect: true
+  autoConnect: true,
+  livenessCheckInterval: 1000,  // Check every second
+  sessionTimeout: 30000          // Timeout after 30 seconds
 });
 
 // Session monitoring
@@ -314,6 +316,26 @@ wss.on('connection', (ws) => {
     'session.updated': (data) => {
       if (currentSessionID === data.sessionID) {
         ws.send(JSON.stringify({ type: 'session.updated', data }));
+      }
+    },
+    'session.liveness': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.liveness', data }));
+      }
+    },
+    'session.retry.start': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.retry.start', data }));
+      }
+    },
+    'session.retry.success': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.retry.success', data }));
+      }
+    },
+    'session.retry.failed': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.retry.failed', data }));
       }
     },
     'error': (error) => {

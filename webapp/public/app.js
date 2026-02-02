@@ -30,6 +30,10 @@ let currentDrawerSession = null;
 // Session status tracking
 const sessionStatuses = new Map(); // Map<sessionID, 'idle' | 'busy' | 'error'>
 
+// Liveness tracking
+const sessionLiveness = new Map(); // Map<sessionID, {seconds: number, timerElement: HTMLElement}>
+let retryNotification = null;
+
 // Rich editor state
 let editorMode = 'simple';  // 'simple' | 'rich'
 let richEditorInstance = null;
@@ -830,6 +834,147 @@ function handleSessionError(data) {
     updateStatus('error', `Error: ${errorName}`);
     
     console.error('[Session Error]', error);
+}
+
+// Liveness monitoring handlers
+function handleSessionLiveness(data) {
+    const { sessionID, secondsSinceLastEvent, isStale } = data;
+    
+    // Update or create timer display for the active message
+    const messages = messagesDiv.querySelectorAll('.message-bubble');
+    const lastMessage = messages[messages.length - 1];
+    
+    if (lastMessage) {
+        // Find or create timer badge
+        let timerBadge = lastMessage.querySelector('.liveness-timer');
+        if (!timerBadge) {
+            timerBadge = document.createElement('span');
+            timerBadge.className = 'liveness-timer';
+            timerBadge.style.cssText = `
+                display: inline-block;
+                margin-left: 8px;
+                padding: 3px 6px;
+                border-radius: 10px;
+                font-size: 11px;
+                font-weight: 600;
+                background: #28a745;
+                color: white;
+                vertical-align: middle;
+            `;
+            
+            // Add to message info bar if it exists, otherwise create a header
+            let targetElement = lastMessage.querySelector('.message-info-bar');
+            if (!targetElement) {
+                targetElement = document.createElement('div');
+                targetElement.className = 'message-info-bar';
+                targetElement.style.cssText = 'margin-bottom: 8px; font-size: 14px; color: #333;';
+                lastMessage.insertBefore(targetElement, lastMessage.firstChild);
+            }
+            targetElement.appendChild(timerBadge);
+        }
+            messageHeader.appendChild(timerBadge);
+        }
+        
+        // Update timer text and color based on time
+        timerBadge.textContent = `⏱ ${secondsSinceLastEvent}s`;
+        
+        if (secondsSinceLastEvent < 10) {
+            timerBadge.style.background = '#28a745'; // Green
+        } else if (secondsSinceLastEvent < 20) {
+            timerBadge.style.background = '#ffc107'; // Yellow
+        } else {
+            timerBadge.style.background = '#dc3545'; // Red
+        }
+        
+        // Store reference
+        sessionLiveness.set(sessionID, {
+            seconds: secondsSinceLastEvent,
+            timerElement: timerBadge
+        });
+    }
+}
+
+function handleRetryStart(data) {
+    const { sessionID, reason, attemptNumber } = data;
+    
+    // Show retry notification
+    showRetryNotification(`🔄 Retrying session (attempt ${attemptNumber || 1}) due to ${reason}...`);
+    
+    // Clear liveness timer
+    const liveness = sessionLiveness.get(sessionID);
+    if (liveness?.timerElement) {
+        liveness.timerElement.remove();
+        sessionLiveness.delete(sessionID);
+    }
+}
+
+function handleRetrySuccess(data) {
+    const { sessionID } = data;
+    
+    // Hide retry notification
+    hideRetryNotification();
+    
+    // Add success message
+    addMessage('system', '✅ Session retry successful!', false, false, false, true);
+}
+
+function handleRetryFailed(data) {
+    const { sessionID, error } = data;
+    
+    // Hide retry notification
+    hideRetryNotification();
+    
+    // Show error
+    addMessage('system', `❌ Session retry failed: ${error}`, false, true, false, true);
+}
+
+function showRetryNotification(message) {
+    // Remove existing notification if any
+    hideRetryNotification();
+    
+    // Create notification
+    retryNotification = document.createElement('div');
+    retryNotification.className = 'retry-notification';
+    retryNotification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #ffc107;
+        color: #000;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-size: 14px;
+        font-weight: 600;
+        animation: slideIn 0.3s ease-out;
+    `;
+    retryNotification.textContent = message;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(retryNotification);
+}
+
+function hideRetryNotification() {
+    if (retryNotification) {
+        retryNotification.remove();
+        retryNotification = null;
+    }
 }
 
 // Safe JSON helper
@@ -1806,8 +1951,17 @@ function connectWebSocket() {
                 }
                 
                 updateStatus(sessionStatus);
-                if (sessionStatus === 'busy') addTypingIndicator('assistant-typing');
-                else if (sessionStatus === 'idle') removeTypingIndicator('assistant-typing');
+                if (sessionStatus === 'busy') {
+                    addTypingIndicator('assistant-typing');
+                } else if (sessionStatus === 'idle') {
+                    removeTypingIndicator('assistant-typing');
+                    // Clean up liveness timer when session becomes idle
+                    const liveness = sessionLiveness.get(sessionID);
+                    if (liveness?.timerElement) {
+                        liveness.timerElement.remove();
+                        sessionLiveness.delete(sessionID);
+                    }
+                }
                 break;
             case 'message.delta':
             case 'message.part':
@@ -1924,6 +2078,18 @@ function connectWebSocket() {
                 break;
             case 'session.error.auth':
                 showAuthError(data.error?.message || 'Authentication failed');
+                break;
+            case 'session.liveness':
+                handleSessionLiveness(data);
+                break;
+            case 'session.retry.start':
+                handleRetryStart(data);
+                break;
+            case 'session.retry.success':
+                handleRetrySuccess(data);
+                break;
+            case 'session.retry.failed':
+                handleRetryFailed(data);
                 break;
         }
     };
