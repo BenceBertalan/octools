@@ -102,7 +102,6 @@ const loadingModal = getEl('loadingModal');
 const loadingText = getEl('loadingText');
 const progressFill = getEl('progressFill');
 const loadingStats = getEl('loadingStats');
-const eventsContainer = getEl('eventsContainer');
 const logsContainer = getEl('logsContainer');
 const logCount = getEl('logCount');
 const refreshLogsBtn = getEl('refreshLogs');
@@ -1354,31 +1353,10 @@ if (qsModelSelect) {
 }
 
 // Diff drawer event listeners
-const diffBtn = document.getElementById('diffBtn');
-const diffDrawerClose = document.getElementById('diffDrawerClose');
-const diffDrawerOverlay = document.getElementById('diffDrawerOverlay');
-const clearDiffBtn = document.getElementById('clearDiffBtn');
+// Files tab event listeners
 const loadPastChangesBtn = document.getElementById('loadPastChangesBtn');
 const clearFilesBtn = document.getElementById('clearFilesBtn');
 
-if (diffBtn) {
-    diffBtn.addEventListener('click', toggleDiffDrawer);
-}
-if (diffDrawerClose) {
-    diffDrawerClose.addEventListener('click', toggleDiffDrawer);
-}
-if (diffDrawerOverlay) {
-    diffDrawerOverlay.addEventListener('click', toggleDiffDrawer);
-}
-if (clearDiffBtn) {
-    clearDiffBtn.addEventListener('click', () => {
-        if (confirm('Clear all file changes for this session?')) {
-            clearSessionDiffs();
-        }
-    });
-}
-
-// Files tab event listeners
 if (loadPastChangesBtn) {
     loadPastChangesBtn.addEventListener('click', loadPastChanges);
 }

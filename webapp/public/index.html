@@ -32,10 +32,7 @@
         
         <!-- Right Side: Files button -->
         <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="diff-btn" id="diffBtn" style="display: none;">
-                <span id="diffBtnText">📄 Files</span>
-                <span id="diffBadge" class="diff-badge" style="display: none;">0</span>
-            </button>
+            <!-- Old drawer button removed - Files is now a tab -->
         </div>
         
         <!-- Hamburger Menu Dropdown -->
@@ -582,26 +579,7 @@
         </div>
     </div>
 
-    <!-- Diff Drawer -->
-    <div class="diff-drawer" id="diffDrawer">
-        <div class="diff-drawer-header">
-            <h3 id="diffDrawerTitle">Files Changed (0)</h3>
-            <button class="diff-drawer-close" id="diffDrawerClose">✕</button>
-        </div>
-        
-        <div class="diff-drawer-content" id="diffDrawerContent">
-            <div class="diff-empty-state">
-                No file changes yet
-            </div>
-        </div>
-        
-        <div class="diff-drawer-footer">
-            <button class="btn-primary" id="clearDiffBtn">Clear All</button>
-        </div>
-    </div>
-
-    <!-- Drawer overlay for mobile -->
-    <div class="diff-drawer-overlay" id="diffDrawerOverlay"></div>
+    <!-- Diff Drawer removed - Files is now a tab -->
 
     <!-- Toast Notification Container -->
     <div class="toast-container" id="toastContainer"></div>
