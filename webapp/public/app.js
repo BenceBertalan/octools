@@ -596,18 +596,63 @@ if (modelPriorityModal && closeModelPriority && menuModelPriority) {
 
 async function loadModelPriority() {
     try {
-        const [config, models] = await Promise.all([
-            fetch('/api/config').then(r => r.json()),
-            fetch('/api/models').then(r => r.json())
+        // Fetch both config and models
+        const [configRes, modelsRes] = await Promise.all([
+            fetch('/api/config'),
+            fetch('/api/models')
         ]);
-
+        
+        const config = await safeJson(configRes) || {};
+        const allModels = await safeJson(modelsRes) || [];
+        
         const priority = config.model_priority || { enabled: false, models: [] };
 
-        // Populate checkbox
+        // Update checkbox
         const enableCostWarnings = document.getElementById('enableCostWarnings');
         if (enableCostWarnings) {
             enableCostWarnings.checked = priority.enabled;
         }
+
+        // Render priority list
+        renderPriorityList(priority.models);
+
+        // Populate add model dropdown (exclude already added)
+        const addModelSelect = document.getElementById('addModelSelect');
+        if (addModelSelect) {
+            const availableModels = allModels.filter(m =>
+                !priority.models.includes(`${m.providerID}/${m.modelID}`)
+            );
+
+            // Clear and add default option
+            addModelSelect.innerHTML = '<option value="">Select a model...</option>';
+            
+            // Group models by provider
+            const groups = {};
+            availableModels.forEach(m => {
+                if (!groups[m.providerID]) groups[m.providerID] = [];
+                groups[m.providerID].push(m);
+            });
+            
+            // Create optgroups
+            Object.entries(groups).forEach(([providerID, providerModels]) => {
+                const group = document.createElement('optgroup');
+                group.label = providerID;
+                
+                providerModels.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = `${m.providerID}/${m.modelID}`;
+                    opt.textContent = m.name || m.modelID;
+                    group.appendChild(opt);
+                });
+                
+                addModelSelect.appendChild(group);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load model priority:', error);
+        showToast('Failed to load model priority', 'error');
+    }
+}
 
         // Render priority list
         renderPriorityList(priority.models);

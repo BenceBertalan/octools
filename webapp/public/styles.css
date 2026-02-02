@@ -1424,6 +1424,28 @@ body.dark .form-group select, body.dark .qs-item select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e4e6eb' d='M1 4l5 5 5-5z'/%3E%3C/svg%3E");
 }
 
+/* Optgroup styling */
+select optgroup {
+    font-weight: bold;
+    font-style: normal;
+    color: inherit;
+}
+
+select option {
+    font-weight: normal;
+    padding-left: 4px;
+}
+
+body.dark select optgroup {
+    color: #e4e6eb;
+    background: #2a2a2a;
+}
+
+body.dark select option {
+    color: #e4e6eb;
+    background: #1a1a1a;
+}
+
 .session-list {
     display: flex;
     flex-direction: column;
@@ -1988,13 +2010,14 @@ body.dark .liveness-label {
 }
 
 body.dark .btn-secondary {
-    background: #3a3b3c;
+    background: #555;
     color: #e4e6eb;
-    border: 1px solid #4e4f50;
+    border: 1px solid #666;
 }
 
 body.dark .btn-secondary:hover {
-    background: #4e4f50;
+    background: #666;
+    color: #e4e6eb;
 }
 
 /* Utils */
