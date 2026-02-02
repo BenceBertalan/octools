@@ -3,6 +3,7 @@ let currentSession = null;
 let currentSessionID = null;
 let ws = null;
 let currentQuestion = null;
+let isQuestionPaused = false; // Track if liveness is paused for question
 let agents = [];
 let models = [];
 let messageBuffer = new Map();
@@ -910,10 +911,8 @@ function handleSessionError(data) {
     const errorMessage = error.message || 'An unknown error occurred';
     const errorDetails = error.details || error.stack;
     
-    // Hide liveness row on error
-    if (livenessRow) {
-        livenessRow.style.display = 'none';
-    }
+    // Show idle state on error
+    updateLivenessDisplay('idle');
     
     // Build error message
     let displayMessage = `❌ **${errorName}**: ${errorMessage}`;
@@ -935,36 +934,60 @@ function handleSessionError(data) {
     console.error('[Session Error]', error);
 }
 
+// Update liveness display based on current state
+function updateLivenessDisplay(state, countdown = null) {
+    if (!livenessRow || !livenessCountdown) return;
+    
+    // Always show the liveness row
+    livenessRow.style.display = 'flex';
+    
+    switch(state) {
+        case 'idle':
+            livenessCountdown.textContent = 'Session not working';
+            livenessCountdown.style.color = '#6b7280'; // Gray
+            livenessCountdown.style.background = 'rgba(107, 114, 128, 0.1)';
+            break;
+            
+        case 'paused':
+            livenessCountdown.textContent = 'Waiting for question, paused';
+            livenessCountdown.style.color = '#8b5cf6'; // Purple
+            livenessCountdown.style.background = 'rgba(139, 92, 246, 0.1)';
+            break;
+            
+        case 'busy':
+            if (countdown !== null) {
+                livenessCountdown.textContent = `${countdown}s`;
+                // Color code based on remaining time
+                if (countdown > 10) {
+                    livenessCountdown.style.color = 'var(--success-color)';
+                    livenessCountdown.style.background = 'rgba(40, 167, 69, 0.1)';
+                } else if (countdown > 5) {
+                    livenessCountdown.style.color = 'var(--warning-color)';
+                    livenessCountdown.style.background = 'rgba(255, 193, 7, 0.1)';
+                } else {
+                    livenessCountdown.style.color = 'var(--error-color)';
+                    livenessCountdown.style.background = 'rgba(220, 53, 69, 0.1)';
+                }
+            }
+            break;
+    }
+}
+
 // Liveness monitoring handlers
 function handleSessionLiveness(data) {
     const { sessionID, secondsSinceLastEvent, isStale } = data;
     
-    // Get liveness timeout from preferences (default 30 seconds)
+    // Get liveness timeout from preferences (default 240 seconds)
     const livenessTimeout = parseInt(getCookie('livenessTimeout') || '240');
     
     // Calculate countdown (timeout - elapsed time)
     const countdown = Math.max(0, livenessTimeout - secondsSinceLastEvent);
     
-    // Show liveness row
-    if (livenessRow) {
-        livenessRow.style.display = 'flex';
-    }
-    
-    // Update countdown display
-    if (livenessCountdown) {
-        livenessCountdown.textContent = `${countdown}s`;
-        
-        // Update color based on remaining time
-        if (countdown > 10) {
-            livenessCountdown.style.color = 'var(--success-color)';
-            livenessCountdown.style.background = 'rgba(40, 167, 69, 0.1)';
-        } else if (countdown > 5) {
-            livenessCountdown.style.color = 'var(--warning-color)';
-            livenessCountdown.style.background = 'rgba(255, 193, 7, 0.1)';
-        } else {
-            livenessCountdown.style.color = 'var(--error-color)';
-            livenessCountdown.style.background = 'rgba(220, 53, 69, 0.1)';
-        }
+    // Update display - if question is paused, show paused state, otherwise show countdown
+    if (isQuestionPaused) {
+        updateLivenessDisplay('paused');
+    } else {
+        updateLivenessDisplay('busy', countdown);
     }
     
     // Store reference
@@ -980,10 +1003,8 @@ function handleRetryStart(data) {
     // Show retry notification
     showRetryNotification(`🔄 Retrying session (attempt ${attemptNumber || 1}) due to ${reason}...`);
     
-    // Hide liveness row
-    if (livenessRow) {
-        livenessRow.style.display = 'none';
-    }
+    // Don't hide liveness row, just update the display
+    updateLivenessDisplay('busy', 0);
     sessionLiveness.delete(sessionID);
 }
 
@@ -993,10 +1014,8 @@ function handleRetrySuccess(data) {
     // Hide retry notification
     hideRetryNotification();
     
-    // Hide liveness row
-    if (livenessRow) {
-        livenessRow.style.display = 'none';
-    }
+    // Keep liveness row visible but clear it (will be updated when busy again)
+    updateLivenessDisplay('idle');
     
     // Add success message
     addMessage('system', '✅ Session retry successful!', false, false, false, true);
@@ -1008,10 +1027,8 @@ function handleRetryFailed(data) {
     // Hide retry notification
     hideRetryNotification();
     
-    // Hide liveness row
-    if (livenessRow) {
-        livenessRow.style.display = 'none';
-    }
+    // Keep liveness row visible but show idle state
+    updateLivenessDisplay('idle');
     
     // Add error message
     addMessage('system', `❌ Session retry failed: ${error}`, true, true, false, true);
@@ -2310,7 +2327,8 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
                         bubble.querySelectorAll('.option-item-inline').forEach(i => i.classList.add('disabled'));
                         bubble.querySelectorAll('.question-tab-btn').forEach(b => b.classList.add('disabled'));
                         
-                        // Resume liveness monitoring after question is answered
+                        // Clear paused flag and resume liveness monitoring after question is answered
+                        isQuestionPaused = false;
                         if (currentSession && currentSession.id) {
                             fetch(`/api/session/${currentSession.id}/liveness/resume`, { method: 'POST' })
                                 .catch(err => console.error('Failed to resume liveness:', err));
@@ -2499,10 +2517,8 @@ function connectWebSocket() {
                     addTypingIndicator('assistant-typing');
                 } else if (sessionStatus === 'idle') {
                     removeTypingIndicator('assistant-typing');
-                    // Hide liveness row when session becomes idle
-                    if (livenessRow) {
-                        livenessRow.style.display = 'none';
-                    }
+                    // Show idle state in liveness row
+                    updateLivenessDisplay('idle');
                     sessionLiveness.delete(sessionID);
                 }
                 break;
@@ -2604,10 +2620,8 @@ function connectWebSocket() {
                 messageBuffer.delete(finalID);
                 removeTypingIndicator('assistant-typing');
                 
-                // Hide liveness row when message completes
-                if (livenessRow) {
-                    livenessRow.style.display = 'none';
-                }
+                // Don't hide liveness row - it will update based on session status
+                // (The session.status event will handle showing idle state)
                 
                 // Clean up progress bubbles for this message
                 const progressMap = progressBubbles.get(finalID);
@@ -2626,6 +2640,10 @@ function connectWebSocket() {
                 currentQuestion = data;
                 const q = (data.questions || (data.properties && data.properties.questions))?.[0];
                 addMessage('assistant', q?.question || '🤔 I have a question for you:', true, false, false, false, {}, data);
+                
+                // Set paused flag and update display
+                isQuestionPaused = true;
+                updateLivenessDisplay('paused');
                 
                 // Pause liveness monitoring while waiting for user answer
                 if (currentSession && currentSession.id) {
