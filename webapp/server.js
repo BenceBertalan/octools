@@ -18,7 +18,7 @@ const octoolsClient = new OctoolsClient({
   baseUrl: OPENCODE_URL,
   autoConnect: true,
   livenessCheckInterval: 1000,  // Check every second
-  sessionTimeout: 30000          // Timeout after 30 seconds
+  sessionTimeout: 240000         // Timeout after 4 minutes (240 seconds)
 });
 
 // Session monitoring
@@ -210,6 +210,24 @@ To see changes, use: git diff ${fileDiff.before || 'HEAD'} ${fileDiff.after} -- 
 app.post('/api/session/:sessionID/abort', async (req, res) => {
   try {
     await octoolsClient.abortSession(req.params.sessionID);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/session/:sessionID/liveness/pause', async (req, res) => {
+  try {
+    octoolsClient.pauseLivenessMonitoring(req.params.sessionID);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/session/:sessionID/liveness/resume', async (req, res) => {
+  try {
+    octoolsClient.resumeLivenessMonitoring(req.params.sessionID);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

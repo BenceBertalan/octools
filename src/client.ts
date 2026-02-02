@@ -27,7 +27,7 @@ export class OctoolsClient extends EventEmitter {
   private livenessTimers: Map<string, any> = new Map();  // Use 'any' to avoid Timer type issues
   private sessionRetryAttempts: Map<string, number> = new Map();
   private readonly DEFAULT_LIVENESS_INTERVAL = 1000;  // 1 second
-  private readonly DEFAULT_SESSION_TIMEOUT = 30000;   // 30 seconds
+  private readonly DEFAULT_SESSION_TIMEOUT = 240000;  // 4 minutes (240 seconds)
 
   constructor(config: ClientConfig) {
     super();
@@ -668,6 +668,31 @@ export class OctoolsClient extends EventEmitter {
       
       // Update session status
       this.sessionStatuses.set(sessionID, 'error');
+    }
+  }
+
+  // --- Public Liveness Control Methods ---
+
+  /**
+   * Pause liveness monitoring for a session (e.g., when user is answering a question)
+   * This stops the timer from firing and prevents automatic retries
+   */
+  public pauseLivenessMonitoring(sessionID: string): void {
+    this.stopLivenessMonitoring(sessionID);
+    console.log(`[Octools] Liveness monitoring paused for session ${sessionID}`);
+  }
+
+  /**
+   * Resume liveness monitoring for a session (e.g., after user answers a question)
+   * This restarts the timer and countdown
+   */
+  public resumeLivenessMonitoring(sessionID: string): void {
+    const status = this.getSessionStatus(sessionID);
+    if (status === 'busy') {
+      // Reset the last activity time to now so countdown starts fresh
+      this.recordAIActivity(sessionID);
+      this.startLivenessMonitoring(sessionID);
+      console.log(`[Octools] Liveness monitoring resumed for session ${sessionID}`);
     }
   }
 }

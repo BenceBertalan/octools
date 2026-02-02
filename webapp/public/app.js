@@ -612,7 +612,7 @@ if (livenessTimeoutInput) {
         if (timeout >= 10 && timeout <= 300) {
             setCookie('livenessTimeout', timeout.toString());
         } else {
-            e.target.value = getCookie('livenessTimeout') || '30';
+            e.target.value = getCookie('livenessTimeout') || '240';
         }
     });
 }
@@ -791,7 +791,7 @@ function applyStoredPreferences() {
     }
     
     // Load liveness timeout
-    const livenessTimeout = getCookie('livenessTimeout') || '30';
+    const livenessTimeout = getCookie('livenessTimeout') || '240';
     if (livenessTimeoutInput) {
         livenessTimeoutInput.value = livenessTimeout;
     }
@@ -940,7 +940,7 @@ function handleSessionLiveness(data) {
     const { sessionID, secondsSinceLastEvent, isStale } = data;
     
     // Get liveness timeout from preferences (default 30 seconds)
-    const livenessTimeout = parseInt(getCookie('livenessTimeout') || '30');
+    const livenessTimeout = parseInt(getCookie('livenessTimeout') || '240');
     
     // Calculate countdown (timeout - elapsed time)
     const countdown = Math.max(0, livenessTimeout - secondsSinceLastEvent);
@@ -2309,6 +2309,12 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
                         submitBtn.textContent = 'Answered ✅';
                         bubble.querySelectorAll('.option-item-inline').forEach(i => i.classList.add('disabled'));
                         bubble.querySelectorAll('.question-tab-btn').forEach(b => b.classList.add('disabled'));
+                        
+                        // Resume liveness monitoring after question is answered
+                        if (currentSession && currentSession.id) {
+                            fetch(`/api/session/${currentSession.id}/liveness/resume`, { method: 'POST' })
+                                .catch(err => console.error('Failed to resume liveness:', err));
+                        }
                     } catch (error) {
                         console.error('Submit answer error:', error);
                         submitBtn.disabled = false;
@@ -2620,6 +2626,12 @@ function connectWebSocket() {
                 currentQuestion = data;
                 const q = (data.questions || (data.properties && data.properties.questions))?.[0];
                 addMessage('assistant', q?.question || '🤔 I have a question for you:', true, false, false, false, {}, data);
+                
+                // Pause liveness monitoring while waiting for user answer
+                if (currentSession && currentSession.id) {
+                    fetch(`/api/session/${currentSession.id}/liveness/pause`, { method: 'POST' })
+                        .catch(err => console.error('Failed to pause liveness:', err));
+                }
                 break;
             case 'session.model_switched':
                 addMessage('assistant', `🔄 **Model Switched**: Now using **${data.model?.modelID}**`, false, false, false, true);
