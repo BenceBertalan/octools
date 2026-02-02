@@ -38,6 +38,12 @@ const sessionStatuses = new Map(); // Map<sessionID, 'idle' | 'busy' | 'error'>
 const sessionLiveness = new Map(); // Map<sessionID, {seconds: number, timerElement: HTMLElement}>
 let retryNotification = null;
 
+// Auto-reconnect state
+let reconnectAttempts = 0;
+let reconnectTimeout = null;
+let maxReconnectDelay = 30000; // 30 seconds max
+let isReconnecting = false;
+
 // Rich editor state
 let editorMode = 'simple';  // 'simple' | 'rich'
 let richEditorInstance = null;
@@ -2429,10 +2435,20 @@ function showToolOutput(progressID) {
 }
 
 function connectWebSocket() {
+    // Clear any existing reconnect timeout
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+    }
+    
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${window.location.host}`);
     
     ws.onopen = () => {
+        // Reset reconnection state on successful connection
+        reconnectAttempts = 0;
+        isReconnecting = false;
+        
         addEvent('System', 'WebSocket connected');
         updateStatus('idle', 'Connected');
         if (reconnectBtn) reconnectBtn.style.display = 'none';
@@ -2636,9 +2652,42 @@ function connectWebSocket() {
     };
     
     ws.onclose = () => {
-        updateStatus('error', 'Disconnected');
-        if (reconnectBtn) reconnectBtn.style.display = 'inline-block';
+        // Don't alarm the user, just start reconnection loop
+        console.log('[WebSocket] Connection closed, attempting to reconnect...');
+        
+        if (isReconnecting) {
+            // Already in reconnection loop, don't start another
+            return;
+        }
+        
+        isReconnecting = true;
+        attemptReconnect();
     };
+    
+    ws.onerror = (error) => {
+        console.error('[WebSocket] Error occurred:', error);
+        // Don't show error to user, auto-reconnect will handle it
+    };
+}
+
+function attemptReconnect() {
+    if (!isReconnecting) return;
+    
+    // Calculate delay with exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
+    const baseDelay = 1000;
+    const delay = Math.min(baseDelay * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+    
+    reconnectAttempts++;
+    
+    console.log(`[WebSocket] Reconnect attempt ${reconnectAttempts} in ${delay}ms...`);
+    updateStatus('warning', `Reconnecting (attempt ${reconnectAttempts})...`);
+    
+    reconnectTimeout = setTimeout(() => {
+        if (!isReconnecting) return;
+        
+        console.log(`[WebSocket] Executing reconnect attempt ${reconnectAttempts}...`);
+        connectWebSocket();
+    }, delay);
 }
 
 async function syncSessionState(sessionID) {
@@ -2682,7 +2731,17 @@ if (reconnectBtn) {
     reconnectBtn.addEventListener('click', () => {
         reconnectBtn.disabled = true;
         reconnectBtn.textContent = 'Connecting...';
+        
+        // Reset reconnection state and attempt immediate connection
+        isReconnecting = false;
+        reconnectAttempts = 0;
+        if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = null;
+        }
+        
         connectWebSocket();
+        
         setTimeout(() => { 
             if (reconnectBtn) {
                 reconnectBtn.disabled = false; 
