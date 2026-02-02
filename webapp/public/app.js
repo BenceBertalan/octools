@@ -2997,7 +2997,7 @@ async function connectToSession(session) {
         // Filter to last 12 hours
         const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000);
         let messagesToShow = recentMessages.filter(msg => {
-            const msgTime = new Date(msg.info.time).getTime();
+            const msgTime = msg.info?.time?.created || 0;
             return msgTime >= twelveHoursAgo;
         });
         
@@ -3071,6 +3071,7 @@ async function connectToSession(session) {
         
         // STAGE 2: Fetch ALL messages in background and cache them
         const displayedCount = messagesToShow.length; // Capture this before async
+        const firstDisplayedMessageID = messagesToShow.length > 0 ? messagesToShow[0].info.id : null; // Capture oldest displayed message ID
         console.log('[UI] Starting background fetch of all messages...');
         fetch(`/api/session/${session.id}/messages`)
             .then(async (response) => {
@@ -3089,8 +3090,19 @@ async function connectToSession(session) {
                 // Cache all messages
                 messagesCache.set(session.id, allMessages);
                 
-                // Calculate how many messages are already displayed
-                const startIndex = allMessages.length - displayedCount;
+                // Find the index of the first displayed message in the full message list
+                let startIndex = 0;
+                if (firstDisplayedMessageID) {
+                    startIndex = allMessages.findIndex(msg => msg.info.id === firstDisplayedMessageID);
+                    if (startIndex === -1) {
+                        // Fallback: if message not found, assume displayed messages are the most recent ones
+                        console.warn('[UI] Could not find first displayed message in full list, using fallback calculation');
+                        startIndex = Math.max(0, allMessages.length - displayedCount);
+                    }
+                } else {
+                    // No messages displayed, start from the end
+                    startIndex = allMessages.length;
+                }
                 
                 // Store oldest displayed index
                 oldestDisplayedIndex.set(session.id, startIndex);
@@ -3101,6 +3113,7 @@ async function connectToSession(session) {
                     updateLoadMoreButton(false, true);
                 } else {
                     console.log(`[UI] All messages displayed (${displayedCount} total)`);
+                    updateLoadMoreButton(false, false); // Hide button when all messages loaded
                 }
             })
             .catch(e => {
