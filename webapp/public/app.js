@@ -213,6 +213,9 @@ function switchToRichMode() {
         // Show selectively formatted markdown (code blocks & headings only)
         richEditor.innerHTML = typeof marked !== 'undefined' ? cleanMarkedOutput(marked.parse(simpleText || '')) : (simpleText || '');
         richEditor.focus();
+        // Update button state for rich mode
+        const hasContent = richEditor.textContent.trim().length > 0;
+        if (sendBtn) sendBtn.disabled = !hasContent;
     }
 }
 
@@ -233,6 +236,9 @@ function switchToSimpleMode() {
         // Trigger resize
         messageInput.style.height = 'auto';
         messageInput.style.height = messageInput.scrollHeight + 'px';
+        // Update button state for simple mode
+        const hasContent = messageInput.value.trim().length > 0;
+        if (sendBtn) sendBtn.disabled = !hasContent;
     }
 }
 
@@ -304,12 +310,14 @@ function nodeToMarkdown(node) {
 
 // Get content from active editor
 function getEditorContent() {
+    let content = '';
     if (editorMode === 'rich' && richEditor) {
-        return htmlToMarkdown(richEditor.innerHTML).trim();
+        content = htmlToMarkdown(richEditor.innerHTML).trim();
     } else if (messageInput) {
-        return messageInput.value.trim();
+        content = messageInput.value.trim();
     }
-    return '';
+    console.log('[DEBUG] getEditorContent - editorMode:', editorMode, 'content:', content);
+    return content;
 }
 
 // Clear active editor
@@ -491,18 +499,32 @@ function resendEditedMessage() {
     sendMessage(editedContent, currentAgent, currentModel);
 }
 
-// Auto-resize textarea
+// Auto-resize textarea and update send button state
 if (messageInput) {
     messageInput.addEventListener('input', () => {
-        messageInput.style.height = 'auto';
-        messageInput.style.height = messageInput.scrollHeight + 'px';
+        // Always update button state when messageInput changes
         const hasContent = messageInput.value.trim().length > 0;
-        if (sendBtn) sendBtn.disabled = !hasContent;
+        console.log('[DEBUG] Input event - hasContent:', hasContent, 'editorMode:', editorMode);
+        if (sendBtn) {
+            sendBtn.disabled = !hasContent;
+            console.log('[DEBUG] Button disabled state:', sendBtn.disabled);
+        }
+        
+        // Auto-resize only in simple mode (rich editor handles its own sizing)
+        if (editorMode === 'simple') {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = messageInput.scrollHeight + 'px';
+        }
     });
 }
 
 // Send message
-if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+if (sendBtn) {
+    sendBtn.addEventListener('click', () => {
+        console.log('[DEBUG] Send button clicked');
+        sendMessage();
+    });
+}
 if (abortBtn) abortBtn.addEventListener('click', abortLastPrompt);
 if (refreshLogsBtn) refreshLogsBtn.addEventListener('click', fetchLogs);
 
@@ -689,16 +711,6 @@ if (richEditor) {
     richEditor.addEventListener('input', () => {
         const hasContent = richEditor.textContent.trim().length > 0;
         if (sendBtn) sendBtn.disabled = !hasContent;
-    });
-}
-
-// Update send button state based on simple input
-if (messageInput) {
-    messageInput.addEventListener('input', () => {
-        if (editorMode === 'simple') {
-            const hasContent = messageInput.value.trim().length > 0;
-            if (sendBtn) sendBtn.disabled = !hasContent;
-        }
     });
 }
 
@@ -2040,6 +2052,8 @@ function clearSessionDiffs() {
 }
 
 async function sendMessage(customText = null, customAgent = null, customModel = null) {
+    console.log('[DEBUG] sendMessage called with:', {customText, customAgent, customModel, currentSession, editorMode});
+    
     if (!currentSession) {
         alert('Please connect to a session first');
         if (settingsModal) settingsModal.classList.add('active');
@@ -2047,7 +2061,11 @@ async function sendMessage(customText = null, customAgent = null, customModel = 
     }
     
     const text = customText || getEditorContent();
-    if (!text) return;
+    console.log('[DEBUG] Text to send:', text);
+    if (!text) {
+        console.log('[DEBUG] No text to send, returning early');
+        return;
+    }
 
     clearEditorContent();
     if (sendBtn) sendBtn.disabled = true;
