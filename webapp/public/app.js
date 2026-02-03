@@ -2283,7 +2283,8 @@ async function processHistoricalEvents() {
                                 messageID: msgId,
                                 tool: part.tool,
                                 agent: part.metadata?.subagent_type || part.state?.agent || part.tool,
-                                task: part.metadata?.description || part.state?.title || 'Processing...'
+                                task: part.metadata?.description || part.state?.title || 'Processing...',
+                                status: part.state?.status || 'completed'  // Historical tools are completed
                             });
                         }
                         
@@ -2374,6 +2375,10 @@ function finishHistoryLoading() {
     historicalMessages.clear();
     historicalParts.clear();
     console.log('[History] Cleared deduplication sets, ready for new messages');
+    
+    // Render tools list after historical events are processed
+    renderToolsList();
+    console.log('[History] Rendered tools list with historical data');
     
     // Re-enable user input
     enableUserInput();
@@ -3997,11 +4002,6 @@ function updateStatus(status, text) {
     if (statusDot) statusDot.className = 'status-dot ' + status;
     if (statusText) statusText.textContent = text || status.charAt(0).toUpperCase() + status.slice(1);
     if (abortBtn) abortBtn.style.display = (status === 'busy' || status === 'retry') ? 'flex' : 'none';
-}
-
-function addEvent(type, data) {
-    // Events tab removed - function deprecated but kept for compatibility
-    return;
 }
 
 function addTypingIndicator(id) {
