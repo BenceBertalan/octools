@@ -1959,7 +1959,7 @@ function handleSessionUpdated(data) {
     currentSession = data.session;
     updateSessionNameDisplay();
     
-    if (oldTitle !== newTitle && newTitle) {
+    if (oldTitle !== newTitle && newTitle && !data.historical) {
         showToast(`Session renamed to: ${newTitle}`, 'info');
     }
 }
