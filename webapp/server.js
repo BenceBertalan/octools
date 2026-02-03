@@ -537,7 +537,9 @@ wss.on('connection', (ws) => {
       }
     },
     'session.sync.complete': (data) => {
+      console.log(`[WS] Received session.sync.complete:`, data);
       if (currentSessionID === data.sessionID) {
+        console.log(`[WS] Forwarding session.sync.complete to client`);
         ws.send(JSON.stringify({ type: 'session.sync.complete', data }));
       }
     },
