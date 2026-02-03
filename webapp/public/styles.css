@@ -110,9 +110,9 @@ body {
     font-size: 13px;
 }
 
-.liveness-label {
-    color: var(--text-secondary);
-    font-weight: 500;
+.status-separator {
+    color: #90949c;
+    margin: 0 4px;
 }
 
 .liveness-countdown {
@@ -138,7 +138,7 @@ body {
 }
 
 .status-dot.idle { background: var(--success-color); }
-.status-dot.busy { background: var(--warning-color); animation: pulse 2s infinite; }
+.status-dot.busy { background: #0084ff; animation: pulse 2s infinite; }
 .status-dot.error { background: var(--error-color); }
 
 @keyframes pulse {
