@@ -39,6 +39,13 @@ const sessionStatuses = new Map(); // Map<sessionID, 'idle' | 'busy' | 'error'>
 const historicalMessages = new Set(); // Set of message IDs already loaded via sync
 const historicalParts = new Set();    // Set of part IDs already loaded via sync
 
+// Historical event loading state
+let isLoadingHistory = false;
+let historicalEventQueue = [];
+let expectedHistoricalEvents = 0;
+let processedHistoricalEvents = 0;
+let syncCompleteReceived = false;
+
 // Liveness tracking
 const sessionLiveness = new Map(); // Map<sessionID, {seconds: number, timerElement: HTMLElement}>
 let retryNotification = null;
@@ -2144,6 +2151,15 @@ function handleSyncComplete(data) {
     
     console.log(`[SyncComplete] Session ${sessionID}: ${rehydratedMessages}/${totalMessages} messages, ${rehydratedDiffs}/${totalDiffs} diffs`);
     
+    // Mark sync as complete and start processing queued events
+    syncCompleteReceived = true;
+    expectedHistoricalEvents = historicalEventQueue.length;
+    
+    console.log(`[History] Received sync complete. ${expectedHistoricalEvents} events queued for processing`);
+    
+    // Process all queued historical events in order
+    processHistoricalEvents();
+    
     // Initialize oldestDisplayedIndex based on what was rehydrated
     if (rehydratedMessages < totalMessages) {
         // We have older messages available
@@ -2157,6 +2173,100 @@ function handleSyncComplete(data) {
         console.log(`[SyncComplete] All messages loaded, hiding Load More button`);
         updateLoadMoreButton(false, false); // Hide button
     }
+}
+
+function updateLoadingProgress() {
+    if (!isLoadingHistory) return;
+    
+    const total = expectedHistoricalEvents || processedHistoricalEvents || 1;
+    const processed = syncCompleteReceived ? 
+        (historicalEventQueue.length > 0 ? (expectedHistoricalEvents - historicalEventQueue.length) : expectedHistoricalEvents) :
+        processedHistoricalEvents;
+    
+    const percentage = Math.min(100, Math.floor((processed / total) * 100));
+    
+    if (progressFill) progressFill.style.width = `${percentage}%`;
+    if (loadingStats) loadingStats.textContent = `${processed} / ${total}`;
+    
+    // Update text based on stage
+    if (!syncCompleteReceived) {
+        if (loadingText) loadingText.textContent = 'Loading historical data...';
+    } else if (historicalEventQueue.length > 0) {
+        if (loadingText) loadingText.textContent = `Processing events: ${processed}/${total}`;
+    } else {
+        if (loadingText) loadingText.textContent = 'Finalizing...';
+    }
+}
+
+async function processHistoricalEvents() {
+    if (historicalEventQueue.length === 0) {
+        console.log('[History] No events to process');
+        finishHistoryLoading();
+        return;
+    }
+    
+    console.log(`[History] Processing ${historicalEventQueue.length} queued events in order`);
+    
+    // Disable user input
+    disableUserInput();
+    
+    // Process events in batches to avoid blocking UI
+    const batchSize = 10;
+    let processedCount = 0;
+    
+    while (historicalEventQueue.length > 0) {
+        const batch = historicalEventQueue.splice(0, batchSize);
+        
+        for (const { type, data } of batch) {
+            // Add to Events tab
+            addEvent(type, data);
+            processedCount++;
+            
+            // Update progress
+            updateLoadingProgress();
+        }
+        
+        // Yield to UI thread
+        await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    
+    console.log(`[History] Processed ${processedCount} historical events`);
+    
+    // Finish loading
+    finishHistoryLoading();
+}
+
+function finishHistoryLoading() {
+    isLoadingHistory = false;
+    historicalEventQueue = [];
+    processedHistoricalEvents = 0;
+    expectedHistoricalEvents = 0;
+    syncCompleteReceived = false;
+    
+    // Re-enable user input
+    enableUserInput();
+    
+    // Hide loading modal
+    setTimeout(() => {
+        if (loadingModal) loadingModal.style.display = 'none';
+        if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, 500);
+    
+    console.log('[History] Loading complete');
+}
+
+function disableUserInput() {
+    if (messageInput) messageInput.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
+    const richEditor = document.getElementById('richEditor');
+    if (richEditor) richEditor.style.pointerEvents = 'none';
+}
+
+function enableUserInput() {
+    if (messageInput) messageInput.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
+    const richEditor = document.getElementById('richEditor');
+    if (richEditor) richEditor.style.pointerEvents = '';
 }
 
 function showRetryNotification(message) {
@@ -3883,6 +3993,15 @@ function connectWebSocket() {
     
     ws.onmessage = (event) => {
         const { type, data } = JSON.parse(event.data);
+        
+        // Queue historical events for ordered processing
+        if (data.historical && isLoadingHistory) {
+            historicalEventQueue.push({ type, data });
+            processedHistoricalEvents++;
+            updateLoadingProgress();
+            return; // Don't process immediately
+        }
+        
         addEvent(type, data);
 
         // Deduplication: if not historical but we already have it in historical sets, ignore
@@ -4362,11 +4481,21 @@ async function loadExistingSessions(search = '') {
 async function connectToSession(session) {
     console.log('[UI] Connecting to session:', session.id);
     
+    // Enable history loading mode
+    isLoadingHistory = true;
+    historicalEventQueue = [];
+    processedHistoricalEvents = 0;
+    expectedHistoricalEvents = 0;
+    syncCompleteReceived = false;
+    
     // Show loading modal
     if (loadingModal) loadingModal.style.display = 'block';
     if (loadingText) loadingText.textContent = 'Connecting to session...';
     if (progressFill) progressFill.style.width = '0%';
     if (loadingStats) loadingStats.textContent = '0 / 0';
+    
+    // Disable user input during loading
+    disableUserInput();
     
     currentSession = session;
     currentSessionID = session.id;
@@ -4402,17 +4531,15 @@ async function connectToSession(session) {
         updateStatus('idle'); 
         if (settingsModal) settingsModal.classList.remove('active');
         
-        // Hide loading modal after a brief delay to allow some history to start arriving
-        setTimeout(() => {
-            if (loadingModal) loadingModal.style.display = 'none';
-            if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 1000);
+        // Don't hide loading modal - will be hidden after processing events
         
     } catch (e) { 
         addEvent('Error', 'Connect failed: ' + e.message);
         if (loadingText) loadingText.textContent = 'Error: ' + e.message;
         setTimeout(() => {
             if (loadingModal) loadingModal.style.display = 'none';
+            enableUserInput();
+            isLoadingHistory = false;
         }, 2000);
     }
 }
