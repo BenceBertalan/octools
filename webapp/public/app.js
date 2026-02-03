@@ -2095,6 +2095,26 @@ function handleRetryFailed(data) {
     addMessage('system', `❌ Session retry failed: ${error}`, true, true, false, true);
 }
 
+function handleSyncComplete(data) {
+    const { sessionID, totalMessages, rehydratedMessages, totalDiffs, rehydratedDiffs } = data;
+    
+    console.log(`[SyncComplete] Session ${sessionID}: ${rehydratedMessages}/${totalMessages} messages, ${rehydratedDiffs}/${totalDiffs} diffs`);
+    
+    // Initialize oldestDisplayedIndex based on what was rehydrated
+    if (rehydratedMessages < totalMessages) {
+        // We have older messages available
+        const oldestIndex = totalMessages - rehydratedMessages;
+        oldestDisplayedIndex.set(sessionID, oldestIndex);
+        console.log(`[SyncComplete] Oldest displayed index set to ${oldestIndex}, ${totalMessages - oldestIndex} more messages available`);
+        updateLoadMoreButton(false, true); // Show "Load More" button
+    } else {
+        // All messages were loaded
+        oldestDisplayedIndex.set(sessionID, 0);
+        console.log(`[SyncComplete] All messages loaded, hiding Load More button`);
+        updateLoadMoreButton(false, false); // Hide button
+    }
+}
+
 function showRetryNotification(message) {
     // Remove existing notification if any
     hideRetryNotification();
@@ -4007,6 +4027,9 @@ function connectWebSocket() {
                 break;
             case 'session.retry.failed':
                 handleRetryFailed(data);
+                break;
+            case 'session.sync.complete':
+                handleSyncComplete(data);
                 break;
         }
     };
