@@ -447,12 +447,20 @@ export class OctoolsClient extends EventEmitter {
 
     // 4. Conversation Replay (limited)
     for (const msg of rehydratedMessages) {
+      // Check if message is complete
+      const isMessageComplete = !!(msg.info.finish || msg.info.time.completed);
+      
       for (const part of msg.parts) {
         // Step 4.1: Handle subagent/task progress for tool/subtask parts
         if (part.type === 'tool' || part.type === 'subtask') {
           const agent = part.metadata?.subagent_type || part.state?.agent || 'agent';
           const task = part.metadata?.description || part.state?.title || part.tool || 'working';
-          const status = part.state?.status || 'running';
+          
+          // If message is complete, all its tools are complete
+          // Otherwise use part.state.status, defaulting to 'completed' for historical data
+          const status = isMessageComplete 
+            ? 'completed' 
+            : (part.state?.status || 'completed');
 
           this.emit('subagent.progress', {
             sessionID,

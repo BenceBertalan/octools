@@ -66,6 +66,9 @@ let originalMessageText = '';
 const favoriteMessages = new Map(); // messageID -> {text, role, timestamp}
 let lastPromptTap = 0; // For double-tap detection
 
+// Todo state tracking - aggregates latest state per todo ID across all messages
+const latestTodoStates = new Map(); // Map<todoID, {status, priority, content, messageID, timestamp}>
+
 // Post-process marked.js output to fix list spacing issues
 function cleanMarkedOutput(html) {
     if (!html) return html;
@@ -2512,49 +2515,102 @@ function createReasoningSection(reasoningParts, messageID) {
     return section;
 }
 
-// Todo section helper
-function createTodoSection(todoParts, messageID) {
+// Helper: Extract todo data from a part
+function extractTodoData(todoPart) {
+    try {
+        if (todoPart.tool === 'todowrite' && todoPart.state?.input?.todos) {
+            return todoPart.state.input.todos;
+        }
+        if (typeof todoPart.text === 'string') {
+            return JSON.parse(todoPart.text);
+        }
+        return todoPart.text;
+    } catch (e) {
+        console.error('Error extracting todo data:', e, todoPart);
+        return null;
+    }
+}
+
+// Helper: Update global todo state tracking
+function updateTodoStates(todoParts, messageID, timestamp) {
+    if (!todoParts || todoParts.length === 0) return;
+    
+    todoParts.forEach(todoPart => {
+        const todoData = extractTodoData(todoPart);
+        if (!todoData || !Array.isArray(todoData)) return;
+        
+        todoData.forEach(todo => {
+            if (!todo.id) return; // Skip todos without IDs
+            
+            const existing = latestTodoStates.get(todo.id);
+            const newTimestamp = timestamp || Date.now();
+            
+            // Update if this is newer or doesn't exist
+            if (!existing || newTimestamp >= (existing.timestamp || 0)) {
+                latestTodoStates.set(todo.id, {
+                    status: todo.status,
+                    priority: todo.priority,
+                    content: todo.content,
+                    messageID: messageID,
+                    timestamp: newTimestamp
+                });
+            }
+        });
+    });
+}
+
+// Todo section helper - uses aggregated state
+function createTodoSection(todoParts, messageID, timestamp) {
     if (!todoParts || todoParts.length === 0) return null;
+    
+    // First, update global todo states with data from this message
+    updateTodoStates(todoParts, messageID, timestamp);
+    
+    // Collect all unique todo IDs from all parts in this message
+    const todoIds = new Set();
+    todoParts.forEach(todoPart => {
+        const todoData = extractTodoData(todoPart);
+        if (todoData && Array.isArray(todoData)) {
+            todoData.forEach(todo => {
+                if (todo.id) todoIds.add(todo.id);
+            });
+        }
+    });
+    
+    if (todoIds.size === 0) return null;
     
     const section = document.createElement('div');
     section.className = 'todo-section';
     section.id = `todo-section-${messageID}`;
     
-    todoParts.forEach((todoPart, idx) => {
-        try {
-            const todoData = todoPart.tool === 'todowrite' && todoPart.state?.input?.todos 
-                ? todoPart.state.input.todos 
-                : (typeof todoPart.text === 'string' ? JSON.parse(todoPart.text) : todoPart.text);
-            
-            if (!todoData || !Array.isArray(todoData)) return;
-            
-            todoData.forEach(todo => {
-                const todoItem = document.createElement('div');
-                todoItem.className = `todo-item todo-${todo.status} todo-priority-${todo.priority}`;
-                
-                const statusIcon = {
-                    'pending': '⏸️',
-                    'in_progress': '▶️',
-                    'completed': '✅',
-                    'cancelled': '❌'
-                }[todo.status] || '⏸️';
-                
-                const priorityClass = todo.priority === 'high' ? 'todo-priority-high' : 
-                                     todo.priority === 'low' ? 'todo-priority-low' : '';
-                
-                todoItem.innerHTML = `
-                    <div class="todo-icon">${statusIcon}</div>
-                    <div class="todo-content ${priorityClass}">
-                        <div class="todo-text">${escapeHtml(todo.content)}</div>
-                        ${todo.status === 'in_progress' ? '<div class="todo-spinner"></div>' : ''}
-                    </div>
-                `;
-                
-                section.appendChild(todoItem);
-            });
-        } catch (e) {
-            console.error('Error parsing todo:', e, todoPart);
-        }
+    // Render todos using latest state for each ID
+    todoIds.forEach(todoId => {
+        const todo = latestTodoStates.get(todoId);
+        if (!todo) return;
+        
+        const todoItem = document.createElement('div');
+        todoItem.className = `todo-item todo-${todo.status} todo-priority-${todo.priority}`;
+        todoItem.dataset.todoId = todoId;
+        
+        const statusIcon = {
+            'pending': '⏸️',
+            'in_progress': '▶️',
+            'completed': '✅',
+            'cancelled': '❌'
+        }[todo.status] || '⏸️';
+        
+        const priorityClass = todo.priority === 'high' ? 'todo-priority-high' : 
+                             todo.priority === 'low' ? 'todo-priority-low' : '';
+        
+        todoItem.innerHTML = `
+            <div class="todo-icon">${statusIcon}</div>
+            <div class="todo-content ${priorityClass}">
+                <div class="todo-text">${escapeHtml(todo.content)}</div>
+                ${todo.status === 'in_progress' ? '<div class="todo-spinner"></div>' : ''}
+            </div>
+        `;
+        
+        section.appendChild(todoItem);
     });
     
     return section.children.length > 0 ? section : null;
@@ -3952,7 +4008,8 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
     
     // Add todo section if present
     if (todoParts && todoParts.length > 0 && msgID) {
-        const todoSection = createTodoSection(todoParts, msgID);
+        const timestamp = metadata?.time?.created || Date.now();
+        const todoSection = createTodoSection(todoParts, msgID, timestamp);
         if (todoSection) {
             bubble.appendChild(todoSection);
         }
@@ -4144,6 +4201,9 @@ function connectWebSocket() {
             // Reset historical tracking
             historicalMessages.clear();
             historicalParts.clear();
+            
+            // Clear todo state tracking for reconnection
+            latestTodoStates.clear();
             
             // Subscribe to trigger server-side sync
             ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
@@ -4669,6 +4729,9 @@ async function connectToSession(session) {
     // Reset historical tracking
     historicalMessages.clear();
     historicalParts.clear();
+    
+    // Clear todo state tracking for new session
+    latestTodoStates.clear();
     
     // Update session name display
     updateSessionNameDisplay();
