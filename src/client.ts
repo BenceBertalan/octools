@@ -380,29 +380,55 @@ export class OctoolsClient extends EventEmitter {
    * to reconstruct the state. This is useful for clients connecting to an existing session.
    */
   public async syncSession(sessionID: string): Promise<void> {
-    // 1. Fetch and emit historical diffs first so the file state is ready
-    try {
-      const diffs = await this.getDiffs(sessionID);
-      for (const diff of diffs) {
-        this.emit('session.diff', {
-          sessionID,
-          diff,
-          historical: true
-        });
-      }
-    } catch (e) {
-      console.warn(`[Octools] Could not fetch historical diffs for ${sessionID}:`, e);
+    // 1. Fetch metadata, messages, and diffs in parallel for performance
+    const [session, messages, diffs] = await Promise.all([
+      this.loadSession(sessionID).catch(e => {
+        console.warn(`[Octools] Could not fetch session metadata for ${sessionID}:`, e);
+        return null;
+      }),
+      this.getMessages(sessionID).catch(e => {
+        console.warn(`[Octools] Could not fetch messages for ${sessionID}:`, e);
+        return [] as Message[];
+      }),
+      this.getDiffs(sessionID).catch(e => {
+        console.warn(`[Octools] Could not fetch historical diffs for ${sessionID}:`, e);
+        return [] as any[];
+      })
+    ]);
+
+    // 2. Baseline state: Session metadata
+    if (session) {
+      // Update internal status trackers
+      this.sessionStatuses.set(sessionID, 'idle'); // History is usually for inactive or catch-up
+      this.sessionModels.set(sessionID, {
+        primary: session.model,
+        secondary: session.secondaryModel,
+        current: session.model
+      });
+
+      this.emit('session.updated', {
+        sessionID,
+        session,
+        historical: true
+      });
     }
 
-    const messages = await this.getMessages(sessionID);
-    
-    // Sort messages by time (though the API usually returns them in order)
+    // 3. Baseline state: Diffs
+    for (const diff of diffs) {
+      this.emit('session.diff', {
+        sessionID,
+        diff,
+        historical: true
+      });
+    }
+
+    // 4. Conversation Replay
+    // Sort messages by time (ensure chronological order)
     messages.sort((a, b) => a.info.time.created - b.info.time.created);
 
     for (const msg of messages) {
-      // For each part in each message, emit relevant events
       for (const part of msg.parts) {
-        // Handle subagent/task progress for historical tool parts
+        // Step 4.1: Handle subagent/task progress for tool/subtask parts
         if (part.type === 'tool' || part.type === 'subtask') {
           const agent = part.metadata?.subagent_type || part.state?.agent || 'agent';
           const task = part.metadata?.description || part.state?.title || part.tool || 'working';
@@ -419,8 +445,8 @@ export class OctoolsClient extends EventEmitter {
           });
         }
 
-        // Emit message.delta for the full content of the historical part
-        // For text/reasoning we use .text, for tools we might want to signal completion
+        // Step 4.2: Emit delta for the full content of the historical part
+        // Text, Reasoning, and Tool inputs/outputs are all emitted here
         this.emit('message.delta', {
           sessionID,
           messageID: msg.info.id,
@@ -431,7 +457,7 @@ export class OctoolsClient extends EventEmitter {
         });
       }
 
-      // If the message is complete, emit message.complete
+      // Step 4.3: Signal message completion
       if (msg.info.finish || msg.info.time.completed) {
         this.emit('message.complete', {
           sessionID,
