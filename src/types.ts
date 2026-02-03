@@ -66,6 +66,22 @@ export interface MessagePart {
   };
 }
 
+export interface MessageDeltaEvent {
+  sessionID: string;
+  messageID: string;
+  partID: string;
+  delta?: string;
+  part: MessagePart;
+  historical?: boolean;
+}
+
+export interface MessageCompleteEvent {
+  sessionID: string;
+  messageID: string;
+  message: MessageInfo;
+  historical?: boolean;
+}
+
 export interface SubagentProgress {
   sessionID: string;
   messageID: string;
@@ -73,6 +89,7 @@ export interface SubagentProgress {
   agent: string;
   task: string;
   status: 'pending' | 'running' | 'completed' | 'error';
+  historical?: boolean;
 }
 
 export class AuthError extends Error {
