@@ -46,6 +46,11 @@ let expectedHistoricalEvents = 0;
 let processedHistoricalEvents = 0;
 let syncCompleteReceived = false;
 
+// Events tracking and filtering
+const allEvents = []; // Array of {type, data, timestamp, element}
+const eventTypeCounts = new Map(); // Map<eventType, count>
+let currentEventFilter = 'all'; // Current active filter
+
 // Liveness tracking
 const sessionLiveness = new Map(); // Map<sessionID, {seconds: number, timerElement: HTMLElement}>
 let retryNotification = null;
@@ -113,6 +118,9 @@ const sendBtn = getEl('sendBtn');
 const abortBtn = getEl('abortBtn');
 const messagesContainer = getEl('messagesContainer');
 const eventsContainer = getEl('eventsContainer');
+const eventsFilterBar = getEl('eventsFilterBar');
+const eventsCount = getEl('eventsCount');
+const clearEventsBtn = getEl('clearEventsBtn');
 const loadingModal = getEl('loadingModal');
 const loadingText = getEl('loadingText');
 const progressFill = getEl('progressFill');
@@ -1750,6 +1758,23 @@ if (clearToolsBtn) {
             renderToolsList();
         }
     });
+}
+
+// Events tab event listeners
+if (clearEventsBtn) {
+    clearEventsBtn.addEventListener('click', () => {
+        if (confirm('Clear all events?')) {
+            clearAllEvents();
+        }
+    });
+}
+
+// Initialize event filter bar
+if (eventsFilterBar) {
+    const allBtn = eventsFilterBar.querySelector('[data-filter="all"]');
+    if (allBtn) {
+        allBtn.addEventListener('click', () => filterEvents('all'));
+    }
 }
 
 // Edit Session Modal event listeners
@@ -3770,10 +3795,105 @@ function addEvent(type, data) {
         return;
     }
     
+    const timestamp = new Date();
     const item = document.createElement('div');
     item.className = 'event-item';
-    item.innerHTML = `<div class="event-header">${type}</div><div class="event-body">${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</div><div class="event-time">${new Date().toLocaleTimeString()}</div>`;
+    item.setAttribute('data-event-type', type);
+    item.innerHTML = `<div class="event-header">${type}</div><div class="event-body">${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</div><div class="event-time">${timestamp.toLocaleTimeString()}</div>`;
+    
+    // Store event
+    allEvents.push({ type, data, timestamp, element: item });
+    
+    // Update event type count
+    eventTypeCounts.set(type, (eventTypeCounts.get(type) || 0) + 1);
+    
+    // Update filter bar
+    updateEventFilterBar();
+    
+    // Update total count
+    if (eventsCount) eventsCount.textContent = allEvents.length;
+    
+    // Apply current filter
+    if (currentEventFilter !== 'all' && currentEventFilter !== type) {
+        item.classList.add('hidden');
+    }
+    
     eventsContainer.prepend(item);
+}
+
+function updateEventFilterBar() {
+    if (!eventsFilterBar) return;
+    
+    // Get unique event types sorted by count (descending)
+    const types = Array.from(eventTypeCounts.entries())
+        .sort((a, b) => b[1] - a[1]);
+    
+    // Clear existing buttons except "All"
+    const allBtn = eventsFilterBar.querySelector('[data-filter="all"]');
+    eventsFilterBar.innerHTML = '';
+    if (allBtn) eventsFilterBar.appendChild(allBtn);
+    
+    // Update All button count
+    if (allBtn) {
+        const countSpan = allBtn.querySelector('.filter-count') || document.createElement('span');
+        countSpan.className = 'filter-count';
+        countSpan.textContent = `(${allEvents.length})`;
+        if (!allBtn.querySelector('.filter-count')) {
+            allBtn.appendChild(countSpan);
+        }
+    }
+    
+    // Add buttons for each event type
+    types.forEach(([type, count]) => {
+        const btn = document.createElement('button');
+        btn.className = 'event-filter-btn';
+        btn.setAttribute('data-filter', type);
+        btn.innerHTML = `${type}<span class="filter-count">(${count})</span>`;
+        btn.addEventListener('click', () => filterEvents(type));
+        eventsFilterBar.appendChild(btn);
+    });
+}
+
+function filterEvents(filterType) {
+    currentEventFilter = filterType;
+    
+    // Update active button
+    if (eventsFilterBar) {
+        eventsFilterBar.querySelectorAll('.event-filter-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-filter') === filterType);
+        });
+    }
+    
+    // Show/hide events based on filter
+    allEvents.forEach(event => {
+        if (filterType === 'all' || event.type === filterType) {
+            event.element.classList.remove('hidden');
+        } else {
+            event.element.classList.add('hidden');
+        }
+    });
+}
+
+function clearAllEvents() {
+    // Clear stored events
+    allEvents.length = 0;
+    eventTypeCounts.clear();
+    currentEventFilter = 'all';
+    
+    // Clear DOM
+    if (eventsContainer) {
+        eventsContainer.innerHTML = '<div class="event-item"><div class="event-header">System</div><div class="event-body">Events cleared. Waiting for new events...</div></div>';
+    }
+    
+    // Reset filter bar
+    if (eventsFilterBar) {
+        eventsFilterBar.innerHTML = '<button class="event-filter-btn active" data-filter="all">All<span class="filter-count">(0)</span></button>';
+        const allBtn = eventsFilterBar.querySelector('[data-filter="all"]');
+        if (allBtn) allBtn.addEventListener('click', () => filterEvents('all'));
+    }
+    
+    // Reset count
+    if (eventsCount) eventsCount.textContent = '0';
 }
 
 function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null, reasoningParts = null, todoParts = null) {
