@@ -2517,7 +2517,7 @@ function handleSubagentProgress(data) {
     }
     
     // Update tools list if not viewing a specific tool detail
-    if (!activeToolDrawerPartID) {
+    if (!activeToolDrawerPartID && !data.historical) {
         renderToolsList();
     }
 }
