@@ -266,8 +266,12 @@ app.get('/api/session/:sessionID', async (req, res) => {
 
 app.patch('/api/session/:sessionID', async (req, res) => {
   try {
-    const { title } = req.body;
-    const session = await octoolsClient.updateSession(req.params.sessionID, { title });
+    const { title, history_limit } = req.body;
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (history_limit !== undefined) updates.history_limit = history_limit;
+    
+    const session = await octoolsClient.updateSession(req.params.sessionID, updates);
     res.json(session);
   } catch (error) {
     if (error instanceof AuthError || error.statusCode === 401 || error.message.includes('Authentication failed')) {
