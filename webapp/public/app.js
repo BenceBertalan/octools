@@ -366,6 +366,32 @@ if (backFromModelPriority) {
     });
 }
 
+// Tap on message background to collapse rich editor
+if (messagesContainer) {
+    messagesContainer.addEventListener('click', (e) => {
+        if (editorMode === 'rich') {
+            // Check if user clicked on interactive elements
+            if (e.target.closest('.message-bubble') || 
+                e.target.closest('.event-item') || 
+                e.target.closest('button') || 
+                e.target.closest('a') || 
+                e.target.closest('input') || 
+                e.target.closest('textarea') ||
+                e.target.closest('.code-block-header')) {
+                return;
+            }
+            
+            // Check if selecting text
+            const selection = window.getSelection();
+            if (selection && selection.toString().length > 0) {
+                return;
+            }
+            
+            switchToSimpleMode();
+        }
+    });
+}
+
 // Page loader functions
 function loadSessionSettingsPage() {
     const content = document.getElementById('sessionSettingsContent');
