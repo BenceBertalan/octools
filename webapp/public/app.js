@@ -2502,7 +2502,7 @@ function handleSubagentProgress(data) {
     } else if (status === 'error') {
         // Show error state
         if (!bubble) {
-            bubble = createProgressBubble(messageID, partID);
+            bubble = createProgressBubble(messageID, partID, data.historical);
             messageProgressMap.set(partID, bubble);
         }
         updateProgressBubble(bubble, agent, task, status);
@@ -2510,7 +2510,7 @@ function handleSubagentProgress(data) {
     } else {
         // pending or running - show/update bubble
         if (!bubble) {
-            bubble = createProgressBubble(messageID, partID);
+            bubble = createProgressBubble(messageID, partID, data.historical);
             messageProgressMap.set(partID, bubble);
         }
         updateProgressBubble(bubble, agent, task, status);
@@ -2555,7 +2555,7 @@ function storeToolEvent(partID, event) {
     }
 }
 
-function createProgressBubble(messageID, partID) {
+function createProgressBubble(messageID, partID, isHistorical = false) {
     const container = document.getElementById('messagesContainer');
     if (!container) return null;
     
@@ -2566,7 +2566,10 @@ function createProgressBubble(messageID, partID) {
     bubble.dataset.partId = partID;
     bubble.dataset.startTime = Date.now();
     container.appendChild(bubble);
-    container.scrollTop = container.scrollHeight;
+    
+    if (!isHistorical) {
+        container.scrollTop = container.scrollHeight;
+    }
     return bubble;
 }
 
