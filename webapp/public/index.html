@@ -269,6 +269,13 @@
                         </small>
                     </div>
                     <div class="form-group">
+                        <label for="historyLimit">History Load Limit (messages)</label>
+                        <input type="number" id="historyLimit" value="200" min="10" max="2000" step="10" autocomplete="off">
+                        <small style="color: #90949c; font-size: 12px; margin-top: 4px; display: block;">
+                            Maximum messages to load when opening a session (10-2000, default: 200)
+                        </small>
+                    </div>
+                    <div class="form-group">
                         <label for="uiScale">UI Scale (%)</label>
                         <input type="range" id="uiScale" min="80" max="200" value="100" step="10" autocomplete="off">
                         <div style="display: flex; justify-content: space-between; margin-top: 4px;">

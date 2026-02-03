@@ -130,6 +130,7 @@ const showReasoningCheckbox = getEl('showReasoning');
 const showEventsTabCheckbox = getEl('showEventsTab');
 const darkThemeCheckbox = getEl('darkTheme');
 const livenessTimeoutInput = getEl('livenessTimeout');
+const historyLimitInput = getEl('historyLimit');
 const livenessRow = getEl('livenessRow');
 const livenessCountdown = getEl('livenessCountdown');
 const uiScaleInput = getEl('uiScale');
@@ -1650,6 +1651,27 @@ if (livenessTimeoutInput) {
     });
 }
 
+if (historyLimitInput) {
+    historyLimitInput.addEventListener('change', async (e) => {
+        const limit = parseInt(e.target.value);
+        if (limit >= 10 && limit <= 2000 && currentSessionID) {
+            try {
+                // Update the session's history_limit in the backend
+                await fetch(`/api/session/${currentSessionID}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history_limit: limit })
+                });
+                console.log(`[Settings] Updated history limit to ${limit} for session ${currentSessionID}`);
+            } catch (err) {
+                console.error('[Settings] Failed to update history limit:', err);
+            }
+        } else if (limit < 10 || limit > 2000) {
+            e.target.value = currentSession?.history_limit || 200;
+        }
+    });
+}
+
 if (uiScaleInput) {
     uiScaleInput.addEventListener('input', (e) => {
         const scale = parseInt(e.target.value);
@@ -1854,6 +1876,13 @@ function applyStoredPreferences() {
     const livenessTimeout = getCookie('livenessTimeout') || '240';
     if (livenessTimeoutInput) {
         livenessTimeoutInput.value = livenessTimeout;
+    }
+    
+    // Load history limit from current session
+    if (historyLimitInput && currentSession) {
+        historyLimitInput.value = currentSession.history_limit || 200;
+    } else if (historyLimitInput) {
+        historyLimitInput.value = 200; // Default
     }
     
     // Load UI scale
