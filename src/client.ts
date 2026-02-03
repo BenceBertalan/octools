@@ -367,11 +367,33 @@ export class OctoolsClient extends EventEmitter {
      return JSON.parse(text) as Message[];
   }
 
+  public async getDiffs(sessionID: string): Promise<any[]> {
+    const res = await fetch(`${this.config.baseUrl}/session/${sessionID}/diff`, {
+      headers: this.headers
+    });
+    if (!res.ok) throw new Error(`Failed to get diffs: ${res.statusText}`);
+    return await res.json();
+  }
+
   /**
    * Synchronizes a session by fetching its history and emitting synthetic events
    * to reconstruct the state. This is useful for clients connecting to an existing session.
    */
   public async syncSession(sessionID: string): Promise<void> {
+    // 1. Fetch and emit historical diffs first so the file state is ready
+    try {
+      const diffs = await this.getDiffs(sessionID);
+      for (const diff of diffs) {
+        this.emit('session.diff', {
+          sessionID,
+          diff,
+          historical: true
+        });
+      }
+    } catch (e) {
+      console.warn(`[Octools] Could not fetch historical diffs for ${sessionID}:`, e);
+    }
+
     const messages = await this.getMessages(sessionID);
     
     // Sort messages by time (though the API usually returns them in order)
@@ -397,12 +419,13 @@ export class OctoolsClient extends EventEmitter {
           });
         }
 
-        // Emit message.delta for the full text of the historical part
+        // Emit message.delta for the full content of the historical part
+        // For text/reasoning we use .text, for tools we might want to signal completion
         this.emit('message.delta', {
           sessionID,
           messageID: msg.info.id,
           partID: part.id,
-          delta: part.text || '', // Historical parts contain the full text
+          delta: part.text || '', 
           part: part,
           historical: true
         });
