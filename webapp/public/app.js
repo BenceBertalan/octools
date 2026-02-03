@@ -102,6 +102,7 @@ const messageInput = getEl('messageInput');
 const sendBtn = getEl('sendBtn');
 const abortBtn = getEl('abortBtn');
 const messagesContainer = getEl('messagesContainer');
+const eventsContainer = getEl('eventsContainer');
 const loadingModal = getEl('loadingModal');
 const loadingText = getEl('loadingText');
 const progressFill = getEl('progressFill');
@@ -119,6 +120,7 @@ const qsAgentSelect = getEl('qsAgentSelect');
 const qsModelSelect = getEl('qsModelSelect');
 const sessionList = getEl('sessionList');
 const showReasoningCheckbox = getEl('showReasoning');
+const showEventsTabCheckbox = getEl('showEventsTab');
 const darkThemeCheckbox = getEl('darkTheme');
 const livenessTimeoutInput = getEl('livenessTimeout');
 const livenessRow = getEl('livenessRow');
@@ -1622,6 +1624,14 @@ if (showReasoningCheckbox) {
     });
 }
 
+if (showEventsTabCheckbox) {
+    showEventsTabCheckbox.addEventListener('change', (e) => {
+        const enabled = e.target.checked;
+        localStorage.setItem('showEventsTab', enabled.toString());
+        toggleEventsTab(enabled);
+    });
+}
+
 if (livenessTimeoutInput) {
     livenessTimeoutInput.addEventListener('change', (e) => {
         const timeout = parseInt(e.target.value);
@@ -1847,6 +1857,13 @@ function applyStoredPreferences() {
         document.documentElement.style.setProperty('--ui-scale', parseInt(uiScale) / 100);
     }
     
+    // Load Events tab preference
+    const showEventsTab = localStorage.getItem('showEventsTab') === 'true';
+    if (showEventsTabCheckbox) {
+        showEventsTabCheckbox.checked = showEventsTab;
+    }
+    toggleEventsTab(showEventsTab);
+    
     // Load favorites from localStorage
     try {
         const stored = localStorage.getItem('favoriteMessages');
@@ -1856,6 +1873,33 @@ function applyStoredPreferences() {
         }
     } catch (e) {
         console.error('Failed to load favorites:', e);
+    }
+}
+
+// Events Tab Management
+function toggleEventsTab(enabled) {
+    const eventsTabBtn = document.getElementById('eventsTabBtn');
+    const eventsTab = document.getElementById('eventsTab');
+    const filesTab = document.getElementById('filesTab');
+    const toolsTab = document.getElementById('toolsTab');
+    
+    if (enabled) {
+        // Show Events tab
+        if (eventsTabBtn) eventsTabBtn.style.display = '';
+        if (eventsTab) {
+            eventsTab.style.display = '';
+            eventsTab.dataset.tabIndex = '1';
+        }
+        // Update Files and Tools tab indices
+        if (filesTab) filesTab.dataset.tabIndex = '2';
+        if (toolsTab) toolsTab.dataset.tabIndex = '3';
+    } else {
+        // Hide Events tab
+        if (eventsTabBtn) eventsTabBtn.style.display = 'none';
+        if (eventsTab) eventsTab.style.display = 'none';
+        // Update Files and Tools tab indices (shift down)
+        if (filesTab) filesTab.dataset.tabIndex = '1';
+        if (toolsTab) toolsTab.dataset.tabIndex = '2';
     }
 }
 
@@ -3409,6 +3453,24 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
 function removeStreamingMessage(messageID) {
     const streamMsg = document.getElementById('stream-' + messageID);
     if (streamMsg) streamMsg.remove();
+}
+
+function addEvent(type, data) {
+    if (!eventsContainer) return;
+    
+    // Check if Events tab is enabled
+    const showEventsTab = localStorage.getItem('showEventsTab') === 'true';
+    if (!showEventsTab) return;
+    
+    // Filter out events with delta property (incremental text updates)
+    if (typeof data === 'object' && data !== null && 'delta' in data) {
+        return;
+    }
+    
+    const item = document.createElement('div');
+    item.className = 'event-item';
+    item.innerHTML = `<div class="event-header">${type}</div><div class="event-body">${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</div><div class="event-time">${new Date().toLocaleTimeString()}</div>`;
+    eventsContainer.prepend(item);
 }
 
 function addMessage(role, text, isQuestion = false, isError = false, isWarning = false, isInfo = false, metadata = {}, questionData = null, reasoningParts = null, todoParts = null) {
