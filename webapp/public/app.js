@@ -248,6 +248,16 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     const target = getEl(tabName + 'Tab');
     if (target) target.classList.add('active');
+    
+    // Trigger tab-specific refresh logic
+    if (tabName === 'files' && currentSessionID) {
+        const diffs = sessionDiffs.get(currentSessionID) || [];
+        renderFilesTab(diffs);
+        console.log(`[switchTab] Refreshed Files tab with ${diffs.length} diff(s)`);
+    } else if (tabName === 'tools') {
+        renderToolsList();
+        console.log('[switchTab] Refreshed Tools tab');
+    }
 }
 
 // Settings Tab switching
@@ -3426,11 +3436,37 @@ function updateToolDetailLive(partID) {
 function handleSessionDiff(data) {
     const { sessionID, diff } = data;
     
+    // Validate sessionID
+    if (!sessionID) {
+        console.error('[handleSessionDiff] Missing sessionID:', data);
+        return;
+    }
+    
+    // Validate diff data
+    if (!diff) {
+        console.warn('[handleSessionDiff] No diff data for session:', sessionID);
+        return;
+    }
+    
+    // Normalize: handle both array and single object (defensive programming)
+    const diffArray = Array.isArray(diff) ? diff : [diff];
+    
+    // Validate diff structure
+    if (diffArray.length === 0) {
+        console.log('[handleSessionDiff] Empty diff array for session:', sessionID);
+        return;
+    }
+    
     // Store diffs for this session
     let existingDiffs = sessionDiffs.get(sessionID) || [];
     
     // Merge new diffs with existing (update if file already exists)
-    diff.forEach(newDiff => {
+    diffArray.forEach(newDiff => {
+        if (!newDiff.file) {
+            console.warn('[handleSessionDiff] Diff missing file property:', newDiff);
+            return;
+        }
+        
         const existingIndex = existingDiffs.findIndex(d => d.file === newDiff.file);
         if (existingIndex >= 0) {
             existingDiffs[existingIndex] = newDiff;
@@ -3441,6 +3477,8 @@ function handleSessionDiff(data) {
     
     sessionDiffs.set(sessionID, existingDiffs);
     
+    console.log(`[handleSessionDiff] Processed ${diffArray.length} diff(s) for session ${sessionID}, total: ${existingDiffs.length}`);
+    
     // Update UI if this is the current session
     if (sessionID === currentSessionID) {
         updateFilesBadge(existingDiffs.length);
@@ -3449,6 +3487,53 @@ function handleSessionDiff(data) {
         }
     }
 }
+
+// Debug helper - expose to console for troubleshooting
+window.debugDiffs = function() {
+    console.log('=== DIFF STATE DEBUG ===');
+    console.log('Current Session ID:', currentSessionID);
+    console.log('Total Sessions with Diffs:', sessionDiffs.size);
+    
+    sessionDiffs.forEach((diffs, sessionID) => {
+        console.log(`\nSession ${sessionID}:`, diffs.length, 'diffs');
+        diffs.forEach(d => {
+            console.log(`  - ${d.file}: +${d.additions || 0}/-${d.deletions || 0}`);
+        });
+    });
+    
+    console.log('\nFiles Tab Active:', isFilesTabActive());
+    console.log('Expanded Diffs:', Array.from(expandedDiffs));
+    console.log('=======================');
+    
+    return {
+        currentSessionID,
+        totalSessions: sessionDiffs.size,
+        currentSessionDiffs: sessionDiffs.get(currentSessionID) || [],
+        allDiffs: Object.fromEntries(sessionDiffs)
+    };
+};
+
+// Helper to quickly filter events to show only diffs
+window.showDiffEvents = function() {
+    const diffBtn = eventsFilterBar?.querySelector('[data-filter="session.diff"]');
+    if (diffBtn) {
+        diffBtn.click();
+        console.log('[showDiffEvents] Filtered to session.diff events');
+        
+        // Switch to Events tab if not already there
+        const eventsTabBtn = document.querySelector('.tab-btn[data-tab="events"]');
+        if (eventsTabBtn && !eventsTabBtn.classList.contains('active')) {
+            eventsTabBtn.click();
+            console.log('[showDiffEvents] Switched to Events tab');
+        }
+    } else {
+        console.warn('[showDiffEvents] No session.diff events found. Make sure Events tab is enabled in Settings.');
+    }
+};
+
+console.log('[Init] Diff debugging available via window.debugDiffs()');
+console.log('[Init] Quick diff event filter via window.showDiffEvents()');
+
 
 function updateFilesBadge(count) {
     const filesBadge = document.getElementById('filesBadge');
