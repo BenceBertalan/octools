@@ -166,6 +166,14 @@ export interface SessionRetryFailedEvent {
   error: string;
 }
 
+export interface SessionSyncCompleteEvent {
+  sessionID: string;
+  totalMessages: number;
+  rehydratedMessages: number;
+  totalDiffs: number;
+  rehydratedDiffs: number;
+}
+
 // Agent types
 export interface AgentInfo {
   name: string;

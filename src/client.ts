@@ -14,7 +14,8 @@ import {
   GlobalConfig,
   ModelPriorityConfig,
   ProviderListResponse,
-  ModelInfo
+  ModelInfo,
+  SessionSyncCompleteEvent
 } from './types';
 
 export class OctoolsClient extends EventEmitter {
@@ -396,6 +397,23 @@ export class OctoolsClient extends EventEmitter {
       })
     ]);
 
+    // Store totals for sync completion event
+    const totalMessages = messages.length;
+    const totalDiffs = diffs.length;
+
+    // Apply rehydration limits: 12 hours OR 200 messages (whichever is smaller)
+    const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000);
+    
+    // Sort messages by time (ensure chronological order)
+    messages.sort((a, b) => a.info.time.created - b.info.time.created);
+    
+    // Filter by time, then limit to most recent 200
+    const recentMessages = messages.filter(m => m.info.time.created >= twelveHoursAgo);
+    const rehydratedMessages = recentMessages.slice(-200);
+    
+    // Apply same 200-limit to diffs (diffs don't have reliable timestamps)
+    const rehydratedDiffs = diffs.slice(-200);
+
     // 2. Baseline state: Session metadata
     if (session) {
       // Update internal status trackers
@@ -413,8 +431,8 @@ export class OctoolsClient extends EventEmitter {
       });
     }
 
-    // 3. Baseline state: Diffs
-    for (const diff of diffs) {
+    // 3. Baseline state: Diffs (limited)
+    for (const diff of rehydratedDiffs) {
       this.emit('session.diff', {
         sessionID,
         diff,
@@ -422,11 +440,8 @@ export class OctoolsClient extends EventEmitter {
       });
     }
 
-    // 4. Conversation Replay
-    // Sort messages by time (ensure chronological order)
-    messages.sort((a, b) => a.info.time.created - b.info.time.created);
-
-    for (const msg of messages) {
+    // 4. Conversation Replay (limited)
+    for (const msg of rehydratedMessages) {
       for (const part of msg.parts) {
         // Step 4.1: Handle subagent/task progress for tool/subtask parts
         if (part.type === 'tool' || part.type === 'subtask') {
@@ -467,6 +482,15 @@ export class OctoolsClient extends EventEmitter {
         });
       }
     }
+
+    // 5. Emit sync completion event
+    this.emit('session.sync.complete', {
+      sessionID,
+      totalMessages,
+      rehydratedMessages: rehydratedMessages.length,
+      totalDiffs,
+      rehydratedDiffs: rehydratedDiffs.length
+    });
   }
 
   public async sendMessage(sessionID: string, text: string, options?: { 
