@@ -401,6 +401,8 @@ export class OctoolsClient extends EventEmitter {
     const totalMessages = messages.length;
     const totalDiffs = diffs.length;
 
+    console.log(`[Octools] Sync session ${sessionID}: ${totalMessages} total messages, ${totalDiffs} total diffs`);
+
     // Apply rehydration limits: 12 hours OR 200 messages (whichever is smaller)
     const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000);
     
@@ -413,6 +415,8 @@ export class OctoolsClient extends EventEmitter {
     
     // Apply same 200-limit to diffs (diffs don't have reliable timestamps)
     const rehydratedDiffs = diffs.slice(-200);
+
+    console.log(`[Octools] Rehydration limits applied: ${rehydratedMessages.length}/${totalMessages} messages (${recentMessages.length} within 12h), ${rehydratedDiffs.length}/${totalDiffs} diffs`);
 
     // 2. Baseline state: Session metadata
     if (session) {
@@ -484,6 +488,7 @@ export class OctoolsClient extends EventEmitter {
     }
 
     // 5. Emit sync completion event
+    console.log(`[Octools] Emitting session.sync.complete for ${sessionID}`);
     this.emit('session.sync.complete', {
       sessionID,
       totalMessages,
