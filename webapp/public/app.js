@@ -2220,6 +2220,91 @@ async function processHistoricalEvents() {
         for (const { type, data } of batch) {
             // Add to Events tab
             addEvent(type, data);
+            
+            // Track historical IDs
+            const msgID = data.messageID || data.id;
+            const partID = data.part?.id || data.partID;
+            if (msgID) historicalMessages.add(msgID);
+            if (partID) historicalParts.add(partID);
+            
+            // Process the event through appropriate handlers
+            switch (type) {
+                case 'session.diff':
+                    handleSessionDiff(data);
+                    break;
+                case 'session.updated':
+                    handleSessionUpdated(data);
+                    break;
+                case 'subagent.progress':
+                    handleSubagentProgress(data);
+                    break;
+                case 'message.delta':
+                case 'message.part':
+                    // For historical events, accumulate in buffer
+                    const msgId = data.messageID || data.id;
+                    const part = data.part || (data.parts && data.parts[0]);
+                    
+                    // Store tool output in event store
+                    if (part && (part.type === 'tool' || part.type === 'subtask')) {
+                        const partId = part.id;
+                        if (!toolEventStore.has(partId)) {
+                            storeToolEvent(partId, {
+                                type: 'tool_init',
+                                timestamp: Date.now(),
+                                messageID: msgId,
+                                tool: part.tool,
+                                agent: part.metadata?.subagent_type || part.state?.agent || part.tool,
+                                task: part.metadata?.description || part.state?.title || 'Processing...'
+                            });
+                        }
+                        
+                        if (data.delta || part.text) {
+                            const toolData = toolEventStore.get(partId);
+                            if (toolData) {
+                                toolData.output += (data.delta || part.text || '');
+                            }
+                        }
+                    }
+                    
+                    // Accumulate text for message
+                    let fullText = messageBuffer.get(msgId) || '';
+                    fullText += (data.delta || data.text || '');
+                    messageBuffer.set(msgId, fullText);
+                    break;
+                case 'message.complete':
+                    // Render the complete message
+                    const finalID = data.messageID || data.id;
+                    const finalContent = messageBuffer.get(finalID) || (data.message && data.message.text);
+                    
+                    // Check if message already exists
+                    if (!document.getElementById('msg-' + finalID)) {
+                        // For historical messages, fetch full message to get all parts
+                        if (currentSession) {
+                            try {
+                                const response = await fetch(`/api/session/${currentSession.id}/messages?limit=300`);
+                                const messages = await response.json();
+                                const fullMsg = messages.find(m => m.info.id === finalID);
+                                
+                                if (fullMsg) {
+                                    const textParts = fullMsg.parts.filter(p => p.type === 'text');
+                                    const reasoningParts = fullMsg.parts.filter(p => p.type === 'reasoning');
+                                    const todoParts = fullMsg.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
+                                    const text = textParts.map(p => p.text).join('\n');
+                                    
+                                    if (text || reasoningParts.length > 0 || todoParts.length > 0) {
+                                        addMessage(fullMsg.info.role, text, false, !!fullMsg.info.error, false, false, fullMsg.info, null, reasoningParts, todoParts);
+                                    }
+                                }
+                            } catch (err) {
+                                console.error('Failed to fetch full message:', err);
+                            }
+                        }
+                    }
+                    
+                    messageBuffer.delete(finalID);
+                    break;
+            }
+            
             processedCount++;
             
             // Update progress
