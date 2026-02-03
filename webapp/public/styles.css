@@ -303,8 +303,8 @@ body {
     margin-bottom: 12px;
 }
 
-body.dark-theme .progress-bar {
-    background: rgba(255, 255, 255, 0.1);
+body.dark .progress-bar {
+    background-color: #3a3b3c;
 }
 
 .progress-fill {
@@ -2960,27 +2960,27 @@ body.dark .session-name-display:hover {
     color: white;
 }
 
-body.dark-theme .session-name-display {
-    background-color: #3a3b3c;
+body.dark .session-name-display {
     color: #e4e6eb;
 }
 
-body.dark-theme .session-name-display:hover {
-    background-color: var(--primary-color);
-    color: white;
+body.dark .session-name-display:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
-body.dark-theme .session-id-hint {
+
+
+body.dark .session-id-hint {
     color: #999;
 }
 
-body.dark-theme .toast-notification {
+body.dark .toast-notification {
     background: #2c2c2e;
     border-color: #444;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-body.dark-theme .toast-message {
+body.dark .toast-message {
     color: #e4e6eb;
 }
 
