@@ -614,3 +614,31 @@ server.listen(PORT, HOST, () => {
   console.log(`Chat webapp running on http://${HOST}:${PORT}`);
   console.log(`Connecting to OpenCode at ${OPENCODE_URL}`);
 });
+
+// Graceful shutdown
+const shutdown = () => {
+  console.log('Shutting down server...');
+  server.close(() => {
+    console.log('HTTP/WS server closed.');
+    // db is imported as module { db, run, get, all }
+    // The sqlite3 instance is db.db
+    if (db && db.db) {
+        db.db.close((err) => {
+            if (err) console.error('Error closing database:', err.message);
+            else console.log('Database connection closed.');
+            process.exit(0);
+        });
+    } else {
+        process.exit(0);
+    }
+  });
+  
+  // Force close after 5s if active connections persist
+  setTimeout(() => {
+    console.error('Forcing shutdown...');
+    process.exit(1);
+  }, 5000);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
