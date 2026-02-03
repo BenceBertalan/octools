@@ -35,6 +35,10 @@ let currentDrawerSession = null;
 // Session status tracking
 const sessionStatuses = new Map(); // Map<sessionID, 'idle' | 'busy' | 'error'>
 
+// History state
+const historicalMessages = new Set(); // Set of message IDs already loaded via sync
+const historicalParts = new Set();    // Set of part IDs already loaded via sync
+
 // Liveness tracking
 const sessionLiveness = new Map(); // Map<sessionID, {seconds: number, timerElement: HTMLElement}>
 let retryNotification = null;
