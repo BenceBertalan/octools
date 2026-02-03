@@ -15,18 +15,18 @@
         
         <!-- Status Content (Two Rows) -->
         <div class="status-content">
-            <!-- First Row: Session name and status -->
+            <!-- First Row: Session name only -->
             <div class="status-row-1">
                 <span class="session-name-display" id="sessionNameDisplay">No Session</span>
-                <span class="status-dot" id="statusDot"></span>
-                <span class="status-text" id="statusText">Initializing...</span>
                 <button id="reconnectBtn" style="display: none; padding: 2px 8px; font-size: 11px; margin-left: 8px;" class="btn-primary">Reconnect</button>
             </div>
             
-            <!-- Second Row: Liveness indicator -->
+            <!-- Second Row: Combined status and timeout -->
             <div class="status-row-2" id="livenessRow" style="display: flex;">
-                <span class="liveness-label">Status:</span>
-                <span class="liveness-countdown" id="livenessCountdown">Session not working</span>
+                <span class="status-dot" id="statusDot"></span>
+                <span class="status-text" id="statusText">Initializing</span>
+                <span class="status-separator">•</span>
+                <span class="liveness-countdown" id="livenessCountdown">--</span>
             </div>
         </div>
         
