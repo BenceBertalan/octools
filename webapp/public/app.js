@@ -4117,9 +4117,36 @@ function connectWebSocket() {
         addEvent('System', 'WebSocket connected');
         updateStatus('idle', 'Connected');
         if (reconnectBtn) reconnectBtn.style.display = 'none';
+        
+        // If we have a current session, re-subscribe and trigger full rehydration
         if (currentSession) {
+            console.log('[WebSocket] Reconnected, triggering full rehydration for session:', currentSession.id);
+            
+            // Enable history loading mode
+            isLoadingHistory = true;
+            historicalEventQueue = [];
+            processedHistoricalEvents = 0;
+            expectedHistoricalEvents = 0;
+            syncCompleteReceived = false;
+            
+            // Show loading modal
+            if (loadingModal) loadingModal.style.display = 'block';
+            if (loadingText) loadingText.textContent = 'Reconnecting to session...';
+            if (progressFill) progressFill.style.width = '0%';
+            if (loadingStats) loadingStats.textContent = '0 / 0';
+            
+            // Disable user input during loading
+            disableUserInput();
+            
+            // Clear messages container for fresh reload
+            if (messagesContainer) messagesContainer.innerHTML = '';
+            
+            // Reset historical tracking
+            historicalMessages.clear();
+            historicalParts.clear();
+            
+            // Subscribe to trigger server-side sync
             ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
-            syncSessionState(currentSession.id);
         }
     };
     
