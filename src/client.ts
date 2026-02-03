@@ -367,6 +367,59 @@ export class OctoolsClient extends EventEmitter {
      return JSON.parse(text) as Message[];
   }
 
+  /**
+   * Synchronizes a session by fetching its history and emitting synthetic events
+   * to reconstruct the state. This is useful for clients connecting to an existing session.
+   */
+  public async syncSession(sessionID: string): Promise<void> {
+    const messages = await this.getMessages(sessionID);
+    
+    // Sort messages by time (though the API usually returns them in order)
+    messages.sort((a, b) => a.info.time.created - b.info.time.created);
+
+    for (const msg of messages) {
+      // For each part in each message, emit relevant events
+      for (const part of msg.parts) {
+        // Handle subagent/task progress for historical tool parts
+        if (part.type === 'tool' || part.type === 'subtask') {
+          const agent = part.metadata?.subagent_type || part.state?.agent || 'agent';
+          const task = part.metadata?.description || part.state?.title || part.tool || 'working';
+          const status = part.state?.status || 'running';
+
+          this.emit('subagent.progress', {
+            sessionID,
+            messageID: msg.info.id,
+            partID: part.id,
+            agent,
+            task,
+            status,
+            historical: true
+          });
+        }
+
+        // Emit message.delta for the full text of the historical part
+        this.emit('message.delta', {
+          sessionID,
+          messageID: msg.info.id,
+          partID: part.id,
+          delta: part.text || '', // Historical parts contain the full text
+          part: part,
+          historical: true
+        });
+      }
+
+      // If the message is complete, emit message.complete
+      if (msg.info.finish || msg.info.time.completed) {
+        this.emit('message.complete', {
+          sessionID,
+          messageID: msg.info.id,
+          message: msg.info,
+          historical: true
+        });
+      }
+    }
+  }
+
   public async sendMessage(sessionID: string, text: string, options?: { 
     agent?: string; 
     model?: { providerID: string; modelID: string };
