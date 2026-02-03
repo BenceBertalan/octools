@@ -4172,7 +4172,7 @@ function connectWebSocket() {
         isReconnecting = false;
         
         addEvent('System', 'WebSocket connected');
-        updateStatus('idle', 'Connected');
+        // Don't set status here - let session.status event handle it after subscription
         if (reconnectBtn) reconnectBtn.style.display = 'none';
         
         // If we have a current session, re-subscribe and trigger full rehydration
@@ -4207,6 +4207,9 @@ function connectWebSocket() {
             
             // Subscribe to trigger server-side sync
             ws.send(JSON.stringify({ type: 'subscribe', sessionID: currentSession.id }));
+        } else {
+            // No session connected, show idle state
+            updateStatus('idle', 'No session');
         }
     };
     
