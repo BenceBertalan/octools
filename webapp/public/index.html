@@ -127,6 +127,15 @@
 
             <!-- Events Tab -->
             <div class="tab-content" id="eventsTab" data-tab-index="1" style="display: none;">
+                <div class="events-header">
+                    <div class="events-header-top">
+                        <h3>Events (<span id="eventsCount">0</span>)</h3>
+                        <button class="btn-secondary" id="clearEventsBtn">Clear All</button>
+                    </div>
+                    <div class="events-filter-bar" id="eventsFilterBar">
+                        <button class="event-filter-btn active" data-filter="all">All</button>
+                    </div>
+                </div>
                 <div class="events-container" id="eventsContainer">
                     <div class="event-item">
                         <div class="event-header">System</div>
