@@ -476,12 +476,13 @@ export class OctoolsClient extends EventEmitter {
         });
       }
 
-      // Step 4.3: Signal message completion
+      // Step 4.3: Signal message completion with full parts array
       if (msg.info.finish || msg.info.time.completed) {
         this.emit('message.complete', {
           sessionID,
           messageID: msg.info.id,
           message: msg.info,
+          parts: msg.parts,  // Include full parts array to avoid frontend API calls
           historical: true
         });
       }
