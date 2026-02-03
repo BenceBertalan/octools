@@ -536,6 +536,11 @@ wss.on('connection', (ws) => {
         ws.send(JSON.stringify({ type: 'session.retry.failed', data }));
       }
     },
+    'session.sync.complete': (data) => {
+      if (currentSessionID === data.sessionID) {
+        ws.send(JSON.stringify({ type: 'session.sync.complete', data }));
+      }
+    },
     'error': (error) => {
       ws.send(JSON.stringify({ type: 'error', data: { message: error.message } }));
     }
@@ -553,6 +558,11 @@ wss.on('connection', (ws) => {
       if (data.type === 'subscribe') {
         currentSessionID = data.sessionID;
         console.log(`[WS] Client subscribed to session: ${currentSessionID}`);
+        
+        // Trigger historical sync for this session
+        octoolsClient.syncSession(currentSessionID).catch(err => {
+          console.error(`[WS] Sync session error for ${currentSessionID}:`, err);
+        });
       }
     } catch (error) {
       console.error('WebSocket message error:', error);
