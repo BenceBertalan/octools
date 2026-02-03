@@ -437,10 +437,11 @@ export class OctoolsClient extends EventEmitter {
     }
 
     // 3. Baseline state: Diffs (limited)
-    for (const diff of rehydratedDiffs) {
+    // Emit all diffs at once as an array to match live event structure
+    if (rehydratedDiffs.length > 0) {
       this.emit('session.diff', {
         sessionID,
-        diff,
+        diff: rehydratedDiffs,
         historical: true
       });
     }
