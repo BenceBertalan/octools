@@ -66,6 +66,18 @@ export interface MessagePart {
   };
 }
 
+export interface SessionUpdatedEvent {
+  sessionID: string;
+  session: Session;
+  historical?: boolean;
+}
+
+export interface SessionDiffEvent {
+  sessionID: string;
+  diff: any;
+  historical?: boolean;
+}
+
 export interface MessageDeltaEvent {
   sessionID: string;
   messageID: string;
