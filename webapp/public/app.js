@@ -2278,25 +2278,38 @@ async function processHistoricalEvents() {
                     
                     // Check if message already exists
                     if (!document.getElementById('msg-' + finalID)) {
-                        // For historical messages, fetch full message to get all parts
-                        if (currentSession) {
-                            try {
-                                const response = await fetch(`/api/session/${currentSession.id}/messages?limit=300`);
-                                const messages = await response.json();
-                                const fullMsg = messages.find(m => m.info.id === finalID);
-                                
-                                if (fullMsg) {
-                                    const textParts = fullMsg.parts.filter(p => p.type === 'text');
-                                    const reasoningParts = fullMsg.parts.filter(p => p.type === 'reasoning');
-                                    const todoParts = fullMsg.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
-                                    const text = textParts.map(p => p.text).join('\n');
+                        // Use parts from event data if available (avoids API call)
+                        if (data.parts && Array.isArray(data.parts)) {
+                            const textParts = data.parts.filter(p => p.type === 'text');
+                            const reasoningParts = data.parts.filter(p => p.type === 'reasoning');
+                            const todoParts = data.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
+                            const text = textParts.map(p => p.text).join('\n');
+                            
+                            if (text || reasoningParts.length > 0 || todoParts.length > 0) {
+                                addMessage(data.message.role, text, false, !!data.message.error, false, false, data.message, null, reasoningParts, todoParts);
+                            }
+                        } else {
+                            // Fallback: fetch from API if parts not included (backwards compatibility)
+                            console.warn('[History] Parts not included in event, falling back to API fetch');
+                            if (currentSession) {
+                                try {
+                                    const response = await fetch(`/api/session/${currentSession.id}/messages?limit=300`);
+                                    const messages = await response.json();
+                                    const fullMsg = messages.find(m => m.info.id === finalID);
                                     
-                                    if (text || reasoningParts.length > 0 || todoParts.length > 0) {
-                                        addMessage(fullMsg.info.role, text, false, !!fullMsg.info.error, false, false, fullMsg.info, null, reasoningParts, todoParts);
+                                    if (fullMsg) {
+                                        const textParts = fullMsg.parts.filter(p => p.type === 'text');
+                                        const reasoningParts = fullMsg.parts.filter(p => p.type === 'reasoning');
+                                        const todoParts = fullMsg.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
+                                        const text = textParts.map(p => p.text).join('\n');
+                                        
+                                        if (text || reasoningParts.length > 0 || todoParts.length > 0) {
+                                            addMessage(fullMsg.info.role, text, false, !!fullMsg.info.error, false, false, fullMsg.info, null, reasoningParts, todoParts);
+                                        }
                                     }
+                                } catch (err) {
+                                    console.error('Failed to fetch full message:', err);
                                 }
-                            } catch (err) {
-                                console.error('Failed to fetch full message:', err);
                             }
                         }
                     }
@@ -2327,6 +2340,11 @@ function finishHistoryLoading() {
     processedHistoricalEvents = 0;
     expectedHistoricalEvents = 0;
     syncCompleteReceived = false;
+    
+    // Clear deduplication sets to allow new messages
+    historicalMessages.clear();
+    historicalParts.clear();
+    console.log('[History] Cleared deduplication sets, ready for new messages');
     
     // Re-enable user input
     enableUserInput();
@@ -4093,8 +4111,14 @@ function connectWebSocket() {
         if (!data.historical) {
             const msgID = data.messageID || data.id;
             const partID = data.part?.id || data.partID;
-            if (msgID && historicalMessages.has(msgID)) return;
-            if (partID && historicalParts.has(partID)) return;
+            if (msgID && historicalMessages.has(msgID)) {
+                console.log('[WS] Blocked duplicate message:', msgID);
+                return;
+            }
+            if (partID && historicalParts.has(partID)) {
+                console.log('[WS] Blocked duplicate part:', partID);
+                return;
+            }
         } else {
             // Track historical IDs
             const msgID = data.messageID || data.id;
