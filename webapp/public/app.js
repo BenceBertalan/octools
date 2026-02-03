@@ -4178,7 +4178,7 @@ if (createSessionBtn) {
             if (settingsModal) settingsModal.classList.remove('active');
             if (messagesContainer) messagesContainer.innerHTML = '';
             addMessage('assistant', 'Session created!');
-            loadSessionHistory(currentSession.id);
+            // loadSessionHistory(currentSession.id); - No longer needed with WebSocket rehydration
         } catch (e) { updateStatus('error', 'Failed'); }
     });
 }
