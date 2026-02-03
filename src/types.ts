@@ -24,6 +24,7 @@ export interface Session {
   agent?: string;
   model?: { providerID: string; modelID: string };
   secondaryModel?: { providerID: string; modelID: string };
+  history_limit?: number;  // Maximum messages to load during rehydration (default: 200)
   time: {
     created: number;
     updated: number;

@@ -322,7 +322,7 @@ export class OctoolsClient extends EventEmitter {
     return JSON.parse(text) as Session;
   }
 
-  public async updateSession(sessionID: string, updates: { title?: string }): Promise<Session> {
+  public async updateSession(sessionID: string, updates: { title?: string; history_limit?: number }): Promise<Session> {
     const res = await fetch(`${this.config.baseUrl}/session/${sessionID}`, {
       method: 'PATCH',
       headers: this.headers,
@@ -403,20 +403,21 @@ export class OctoolsClient extends EventEmitter {
 
     console.log(`[Octools] Sync session ${sessionID}: ${totalMessages} total messages, ${totalDiffs} total diffs`);
 
-    // Apply rehydration limits: 12 hours OR 200 messages (whichever is smaller)
+    // Apply rehydration limits: 12 hours OR configurable limit (whichever is smaller)
+    const historyLimit = session?.history_limit || 200;  // Default to 200 if not set
     const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000);
     
     // Sort messages by time (ensure chronological order)
     messages.sort((a, b) => a.info.time.created - b.info.time.created);
     
-    // Filter by time, then limit to most recent 200
+    // Filter by time, then limit to most recent N messages
     const recentMessages = messages.filter(m => m.info.time.created >= twelveHoursAgo);
-    const rehydratedMessages = recentMessages.slice(-200);
+    const rehydratedMessages = recentMessages.slice(-historyLimit);
     
-    // Apply same 200-limit to diffs (diffs don't have reliable timestamps)
-    const rehydratedDiffs = diffs.slice(-200);
+    // Apply same limit to diffs (diffs don't have reliable timestamps)
+    const rehydratedDiffs = diffs.slice(-historyLimit);
 
-    console.log(`[Octools] Rehydration limits applied: ${rehydratedMessages.length}/${totalMessages} messages (${recentMessages.length} within 12h), ${rehydratedDiffs.length}/${totalDiffs} diffs`);
+    console.log(`[Octools] Rehydration limits applied: ${rehydratedMessages.length}/${totalMessages} messages (${recentMessages.length} within 12h, limit: ${historyLimit}), ${rehydratedDiffs.length}/${totalDiffs} diffs`);
 
     // 2. Baseline state: Session metadata
     if (session) {
