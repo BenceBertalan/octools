@@ -2087,20 +2087,20 @@ function updateLivenessDisplay(state, countdown = null) {
     
     switch(state) {
         case 'idle':
-            livenessCountdown.textContent = 'Session not working';
+            livenessCountdown.textContent = 'No activity';
             livenessCountdown.style.color = '#6b7280'; // Gray
             livenessCountdown.style.background = 'rgba(107, 114, 128, 0.1)';
             break;
             
         case 'paused':
-            livenessCountdown.textContent = 'Waiting for question, paused';
+            livenessCountdown.textContent = 'Waiting for response';
             livenessCountdown.style.color = '#8b5cf6'; // Purple
             livenessCountdown.style.background = 'rgba(139, 92, 246, 0.1)';
             break;
             
         case 'busy':
             if (countdown !== null) {
-                livenessCountdown.textContent = `${countdown}s`;
+                livenessCountdown.textContent = `Timeout: ${countdown}s`;
                 // Color code based on remaining time
                 if (countdown > 10) {
                     livenessCountdown.style.color = 'var(--success-color)';
