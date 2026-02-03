@@ -3376,7 +3376,11 @@ function updateStreamingMessage(messageID, text, isReasoning = false, metadata =
     
     const content = streamMsg.querySelector('.message-content') || streamMsg;
     content.innerHTML = typeof marked !== 'undefined' ? cleanMarkedOutput(marked.parse(text)) : text;
-    if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Silence scrolling for historical messages
+    if (messagesContainer && !metadata.historical) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
 }
 
 function removeStreamingMessage(messageID) {
@@ -3391,6 +3395,11 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
 
     const msgID = metadata ? (metadata.id || metadata.messageID) : null;
     if (msgID && document.getElementById('msg-' + msgID)) return;
+
+    // Track historical messages for deduplication
+    if (metadata?.historical && msgID) {
+        historicalMessages.add(msgID);
+    }
 
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${role}`;
@@ -3636,7 +3645,10 @@ function addMessage(role, text, isQuestion = false, isError = false, isWarning =
             messagesContainer.appendChild(time);
         }
         
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // Silence scrolling for historical messages
+        if (!metadata.historical) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
     }
 }
 
@@ -3787,6 +3799,21 @@ function connectWebSocket() {
     ws.onmessage = (event) => {
         const { type, data } = JSON.parse(event.data);
         addEvent(type, data);
+
+        // Deduplication: if not historical but we already have it in historical sets, ignore
+        if (!data.historical) {
+            const msgID = data.messageID || data.id;
+            const partID = data.part?.id || data.partID;
+            if (msgID && historicalMessages.has(msgID)) return;
+            if (partID && historicalParts.has(partID)) return;
+        } else {
+            // Track historical IDs
+            const msgID = data.messageID || data.id;
+            const partID = data.part?.id || data.partID;
+            if (msgID) historicalMessages.add(msgID);
+            if (partID) historicalParts.add(partID);
+        }
+
         switch (type) {
             case 'session.status':
                 const sessionStatus = (data.status && data.status.type) || data.status || data.type;
@@ -4256,6 +4283,10 @@ async function connectToSession(session) {
     currentSession = session;
     currentSessionID = session.id;
     currentDrawerSession = session.id;
+
+    // Reset historical tracking
+    historicalMessages.clear();
+    historicalParts.clear();
     
     // Update session name display
     updateSessionNameDisplay();
@@ -4272,149 +4303,22 @@ async function connectToSession(session) {
     if (messagesContainer) messagesContainer.innerHTML = '';
     
     try {
-        // STAGE 1: Fetch recent messages quickly (up to 200)
-        if (loadingText) loadingText.textContent = 'Fetching recent messages...';
-        if (progressFill) progressFill.style.width = '10%';
-        
-        const initialResponse = await fetch(`/api/session/${session.id}/messages?limit=200`);
-        if (!initialResponse.ok) throw new Error('Failed to fetch messages');
-        const recentMessages = await safeJson(initialResponse) || [];
-        
-        // Sort messages by creation time (oldest first)
-        recentMessages.sort((a, b) => {
-            const timeA = a.info?.time?.created || 0;
-            const timeB = b.info?.time?.created || 0;
-            return timeA - timeB;
-        });
-        
-        console.log(`[UI] Fetched ${recentMessages.length} recent messages`);
-        
-        // Filter to last 12 hours
-        const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000);
-        let messagesToShow = recentMessages.filter(msg => {
-            const msgTime = msg.info?.time?.created || 0;
-            return msgTime >= twelveHoursAgo;
-        });
-        
-        // If filtered messages exceed 200 or we got exactly 200, use all 200
-        if (messagesToShow.length > 200 || recentMessages.length === 200) {
-            messagesToShow = recentMessages;
+        // Subscribe to WebSocket updates - this triggers server-side sync (rehydration)
+        if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
+        } else {
+            // If socket not open, connect and it will subscribe on open
+            connectWebSocket();
         }
         
-        console.log(`[UI] Showing ${messagesToShow.length} messages from last 12h`);
-        
-        // Update progress: fetched initial messages
-        if (loadingText) loadingText.textContent = `Showing ${messagesToShow.length} recent messages`;
-        if (loadingStats) loadingStats.textContent = `${messagesToShow.length} messages`;
-        if (progressFill) progressFill.style.width = '40%';
-        
-        // Temporarily cache the recent messages (will be replaced by full cache)
-        messagesCache.set(session.id, messagesToShow);
-        oldestDisplayedIndex.set(session.id, 0);
-        
-        // Subscribe to WebSocket updates
-        if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'subscribe', sessionID: session.id }));
         updateStatus('idle'); 
         if (settingsModal) settingsModal.classList.remove('active');
         
-        // Update progress: rendering messages
-        if (loadingText) loadingText.textContent = 'Rendering messages...';
-        if (progressFill) progressFill.style.width = '50%';
-        
-        // Render messages with progress updates
-        let processedCount = 0;
-        for (let i = 0; i < messagesToShow.length; i++) {
-            const msg = messagesToShow[i];
-            const textParts = msg.parts.filter(p => p.type === 'text');
-            const reasoningParts = msg.parts.filter(p => p.type === 'reasoning');
-            const todoParts = msg.parts.filter(p => p.type === 'tool' && p.tool === 'todowrite');
-            const text = textParts.map(p => p.text).join('\n');
-            
-            // Log all messages to Events tab
-            addEvent('Load Message', {
-                source: 'connectToSession',
-                messageID: msg.info.id,
-                role: msg.info.role,
-                totalParts: msg.parts.length,
-                textParts: textParts.length,
-                reasoningParts: reasoningParts.length,
-                todoParts: todoParts.length,
-                hasText: !!text,
-                partTypes: msg.parts.map(p => p.type),
-                modelID: msg.info.modelID,
-                agent: msg.info.agent
-            });
-            
-            if (text || reasoningParts.length > 0 || todoParts.length > 0) {
-                addMessage(msg.info.role, text, false, !!msg.info.error, false, false, msg.info, null, reasoningParts, todoParts);
-            }
-            
-            processedCount++;
-            if (loadingStats) loadingStats.textContent = `Rendered ${processedCount} / ${messagesToShow.length}`;
-            
-            // Update progress during rendering (50-90%)
-            const renderProgress = 50 + (processedCount / messagesToShow.length) * 40;
-            if (progressFill) progressFill.style.width = `${renderProgress}%`;
-        }
-        
-        // Complete initial load - hide loading modal
-        if (loadingText) loadingText.textContent = 'Complete!';
-        if (progressFill) progressFill.style.width = '100%';
+        // Hide loading modal after a brief delay to allow some history to start arriving
         setTimeout(() => {
             if (loadingModal) loadingModal.style.display = 'none';
-        }, 300);
-        
-        // STAGE 2: Fetch ALL messages in background and cache them
-        const displayedCount = messagesToShow.length; // Capture this before async
-        const firstDisplayedMessageID = messagesToShow.length > 0 ? messagesToShow[0].info.id : null; // Capture oldest displayed message ID
-        console.log('[UI] Starting background fetch of all messages...');
-        fetch(`/api/session/${session.id}/messages`)
-            .then(async (response) => {
-                if (!response.ok) throw new Error('Failed to fetch all messages');
-                const allMessages = await safeJson(response) || [];
-                
-                // Sort all messages by creation time (oldest first)
-                allMessages.sort((a, b) => {
-                    const timeA = a.info?.time?.created || 0;
-                    const timeB = b.info?.time?.created || 0;
-                    return timeA - timeB;
-                });
-                
-                console.log(`[UI] Background fetch complete: ${allMessages.length} total messages cached`);
-                
-                // Cache all messages
-                messagesCache.set(session.id, allMessages);
-                
-                // Find the index of the first displayed message in the full message list
-                let startIndex = 0;
-                if (firstDisplayedMessageID) {
-                    startIndex = allMessages.findIndex(msg => msg.info.id === firstDisplayedMessageID);
-                    if (startIndex === -1) {
-                        // Fallback: if message not found, assume displayed messages are the most recent ones
-                        console.warn('[UI] Could not find first displayed message in full list, using fallback calculation');
-                        startIndex = Math.max(0, allMessages.length - displayedCount);
-                    }
-                } else {
-                    // No messages displayed, start from the end
-                    startIndex = allMessages.length;
-                }
-                
-                // Store oldest displayed index
-                oldestDisplayedIndex.set(session.id, startIndex);
-                
-                // Add "Load More" button if there are older messages
-                if (startIndex > 0) {
-                    console.log(`[UI] ${startIndex} older messages available (displayed ${displayedCount} of ${allMessages.length})`);
-                    updateLoadMoreButton(false, true);
-                } else {
-                    console.log(`[UI] All messages displayed (${displayedCount} total)`);
-                    updateLoadMoreButton(false, false); // Hide button when all messages loaded
-                }
-            })
-            .catch(e => {
-                console.error('[UI] Background fetch failed:', e);
-                addEvent('Warning', 'Failed to load full message history: ' + e.message);
-            });
+            if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 1000);
         
     } catch (e) { 
         addEvent('Error', 'Connect failed: ' + e.message);
